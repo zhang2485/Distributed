@@ -140,7 +140,6 @@ class queryThread extends Thread implements Runnable {
             synchronized (System.out) {
                 System.out.println(sb.toString());
             }
-
         } catch (IOException e) {
             System.out.printf("Could not query to %s\n", ip);
         }
