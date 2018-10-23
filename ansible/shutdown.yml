@@ -4,4 +4,4 @@
   tasks:
       - name: stop server
         become: yes
-        shell: systemctl stop mp2
+        shell: systemctl stop ece428

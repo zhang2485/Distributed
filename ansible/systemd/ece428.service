@@ -1,8 +1,8 @@
 [Unit]
-Description=mp2
+Description=ece428
 
 [Service]
-WorkingDirectory=/home/dphuang2/mp2
+WorkingDirectory=/home/dphuang2/ece428
 ExecStart=/usr/bin/env java Server
 SuccessExitStatus=143
 

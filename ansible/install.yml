@@ -7,24 +7,11 @@
       repo_remote: origin
       repo_branch: master
       git_directory: /home/dphuang2
+      service_path: ansible/aystemd/ece428.service
+      service_directory: /usr/lib/systemd/system/
       java_main_class: Server
   tasks:
       - name: get the code
         git: repo={{repo_url}} dest={{git_directory}}/{{repo_name}} version={{repo_branch}}
-      - name: remake files
-        make:
-            chdir: "{{git_directory}}/{{repo_name}}"
-
-- hosts: introducer
-  gather_facts: no
-  tasks:
-      - name: restart server
-        become: yes
-        shell: systemctl restart ece428
-
-- hosts: connect
-  gather_facts: no
-  tasks:
-      - name: restart server
-        become: yes
-        shell: systemctl restart ece428
+      - name: install systemd service
+        command: "cp {{git_directory}}/{{repo_name}}/{{service_path}} {{service_directory}}"
