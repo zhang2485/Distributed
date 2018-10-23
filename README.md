@@ -26,7 +26,12 @@ updates to every other node in its membership list.
 ### Prerequisites
 We are using Java to develop and Ansible to deploy.
 
-## Deploying to VMs
+### Setting up Ansible 
+There are two steps we need to do to use Ansible properly.
+1. Change ansible/hosts to match your server ips
+2. run ```./install.sh```
+
+### Deploying to VMs
 We are using Ansible to deploy our code to the VMs. All the configuration files
 used for Ansible are in ```ansible/```. Use ```./deploy.sh``` to deploy code and
 start server. Use ```./shutdown.sh``` to shutdown all the servers.

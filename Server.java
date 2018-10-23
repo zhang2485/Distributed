@@ -8,7 +8,7 @@ import java.nio.file.Files;
 
 public class Server {
     static final String IP_DELIMITER = " ";
-    private static final String INTRODUCER_IP = "172.22.154.22";
+    private static final String INTRODUCER_IP = "172.22.156.255";
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ss.SSS");
     private static final int SERVER_PORT = 2017;
     volatile static String ip;

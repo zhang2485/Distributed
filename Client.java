@@ -10,16 +10,16 @@ public class Client {
 
     private static final int SERVER_PORT = 2017;
     private static final String[] serverList = {
-            "fa18-cs425-g07-01.cs.illinois.edu",
-            "fa18-cs425-g07-02.cs.illinois.edu",
-            "fa18-cs425-g07-03.cs.illinois.edu",
-            "fa18-cs425-g07-04.cs.illinois.edu",
-            "fa18-cs425-g07-05.cs.illinois.edu",
-            "fa18-cs425-g07-06.cs.illinois.edu",
-            "fa18-cs425-g07-07.cs.illinois.edu",
-            "fa18-cs425-g07-08.cs.illinois.edu",
-            "fa18-cs425-g07-09.cs.illinois.edu",
-            "fa18-cs425-g07-10.cs.illinois.edu"
+            "fa18-cs425-g77-01.cs.illinois.edu",
+            "fa18-cs425-g77-02.cs.illinois.edu",
+            "fa18-cs425-g77-03.cs.illinois.edu",
+            "fa18-cs425-g77-04.cs.illinois.edu",
+            "fa18-cs425-g77-05.cs.illinois.edu",
+            "fa18-cs425-g77-06.cs.illinois.edu",
+            "fa18-cs425-g77-07.cs.illinois.edu",
+            "fa18-cs425-g77-08.cs.illinois.edu",
+            "fa18-cs425-g77-09.cs.illinois.edu",
+            "fa18-cs425-g77-10.cs.illinois.edu"
     };
     private static HashSet<String> commands = new HashSet<>(Arrays.asList(
             "grep",
