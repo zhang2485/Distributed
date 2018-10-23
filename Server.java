@@ -178,21 +178,22 @@ public class Server {
 
     /**
      * Checks if fileName exists in current working vm directory
+     *
      * @param fileName
      * @return
      */
-    
+
     private static boolean fileExists(String fileName) {
-    	File directory = new File(System.getProperty("user.dir"));
-    	File [] files = directory.listFiles();
-    	for(File f: files) {
-    		if(f.getName().equals(fileName)) {
-    			return true;
-    		}
-    	}
-    	return false;
+        File directory = new File(System.getProperty("user.dir"));
+        File[] files = directory.listFiles();
+        for (File f : files) {
+            if (f.getName().equals(fileName)) {
+                return true;
+            }
+        }
+        return false;
     }
-    
+
     public static void main(String args[]) throws IOException, InterruptedException {
         setupServer();
 
@@ -271,14 +272,13 @@ public class Server {
                      checks if file exists on VM
                      */
                     case "ls":
-                    	if(fileExists(cmds[1])) {
-                    		writer.writeBytes(Server.ip + '\n');
-                    	}
-                    	else {
-                    		writer.writeBytes("");
-                    	}
-                    	Server.writeToLog(String.format("Checked for %s.", cmds[1]));
-                    	break;
+                        if (fileExists(cmds[1])) {
+                            writer.writeBytes(Server.ip + '\n');
+                        } else {
+                            writer.writeBytes("");
+                        }
+                        Server.writeToLog(String.format("Checked for %s.", cmds[1]));
+                        break;
                     default:
                         writeToLog(String.format("Received invalid command: %s", cmds[0]));
                         break;

@@ -8,27 +8,25 @@ import java.util.*;
 
 public class Client {
 
-	public static String checkCommand(String cmd) {
-		String ret = "INVALID";
-		String[] components = cmd.split(" ");
-		if(components.length == 1) {
-			if(components[0].equals("store")) {
-				ret = components[0];
-			}
-		}
-		else if(components.length == 2) {
-			if(components[0].equals("delete") || components[0].equals("ls")) {
-				ret = cmd;
-			}
-		}
-		else if(components.length == 3) {
-			if(components[0].equals("put") || components[0].equals("get")) {
-				ret = cmd;
-			}
-		}
-		return ret;
-	}
-	
+    public static String checkCommand(String cmd) {
+        String ret = "INVALID";
+        String[] components = cmd.split(" ");
+        if (components.length == 1) {
+            if (components[0].equals("store")) {
+                ret = components[0];
+            }
+        } else if (components.length == 2) {
+            if (components[0].equals("delete") || components[0].equals("ls")) {
+                ret = cmd;
+            }
+        } else if (components.length == 3) {
+            if (components[0].equals("put") || components[0].equals("get")) {
+                ret = cmd;
+            }
+        }
+        return ret;
+    }
+
     private static HashSet<String> commands = new HashSet<>(Arrays.asList(
             "grep",
             "exit",
@@ -68,22 +66,22 @@ public class Client {
             return;
         }
         System.out.printf("================= %s =================\n", cmd);
-        if(cmd.equals("store")) {
-        	File directory = new File(System.getProperty("user.dir"));
-        	File [] files = directory.listFiles();
-        	for(File f: files) {
-        		System.out.println(f.getName());
-        	}
-        }else {
-        	
-        	ArrayList<queryThread> threads = new ArrayList<>();
-        	for (String server : serverList) {
-        		queryThread thread = new queryThread(server, SERVER_PORT, cmd);
-        		thread.start();
-        		threads.add(thread);
-        	}
-        	for (queryThread thread : threads)
-        		thread.join();
+        if (cmd.equals("store")) {
+            File directory = new File(System.getProperty("user.dir"));
+            File[] files = directory.listFiles();
+            for (File f : files) {
+                System.out.println(f.getName());
+            }
+        } else {
+
+            ArrayList<queryThread> threads = new ArrayList<>();
+            for (String server : serverList) {
+                queryThread thread = new queryThread(server, SERVER_PORT, cmd);
+                thread.start();
+                threads.add(thread);
+            }
+            for (queryThread thread : threads)
+                thread.join();
         }
         System.out.printf("================= %s =================\n", cmd);
         lastInput = new String(cmd);
@@ -91,7 +89,7 @@ public class Client {
 
     public static void main(String[] args) throws IOException, InterruptedException {
         @SuppressWarnings("resource")
-		Scanner userInput = new Scanner(System.in);
+        Scanner userInput = new Scanner(System.in);
         while (true) {
             System.out.println("Type a Command: ");
             String input = userInput.nextLine().trim();
@@ -125,27 +123,27 @@ class queryThread extends Thread implements Runnable {
 
     @Override
     public void run() {
-        String [] components = cmd.split(" ");
+        String[] components = cmd.split(" ");
         try {
             socket = new Socket(ip, port);
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             writer = new DataOutputStream(socket.getOutputStream());
             writer.writeBytes(cmd);
             StringBuilder sb = new StringBuilder();
-            if(!components[0].equals("ls"))
-            	sb.append(String.format("%s\n", ip));
+            if (!components[0].equals("ls"))
+                sb.append(String.format("%s\n", ip));
             String line;
             while ((line = reader.readLine()) != null)
                 sb.append(String.format("%s", line));
 
             synchronized (System.out) {
-            	if(!(sb.toString().trim().length() == 0))
-                	System.out.println(sb.toString());
+                if (!(sb.toString().trim().length() == 0))
+                    System.out.println(sb.toString());
             }
 
         } catch (IOException e) {
-        	if(!components[0].equals("ls"))
-            	System.out.printf("Could not query to %s\n", ip);
+            if (!components[0].equals("ls"))
+                System.out.printf("Could not query to %s\n", ip);
             return;
         }
     }
