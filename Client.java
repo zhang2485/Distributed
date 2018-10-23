@@ -135,7 +135,7 @@ class queryThread extends Thread implements Runnable {
             sb.append(String.format("%s\n", ip));
             String line;
             while ((line = reader.readLine()) != null)
-                sb.append(String.format("%s", line));
+                sb.append(String.format("%s\n", line));
 
             synchronized (System.out) {
                 System.out.println(sb.toString());
