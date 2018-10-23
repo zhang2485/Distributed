@@ -273,9 +273,9 @@ public class Server {
                      */
                     case "ls":
                         if (fileExists(cmds[1])) {
-                            writer.writeBytes(Server.ip + '\n');
+                            writer.writeBytes("File found!");
                         } else {
-                            writer.writeBytes("");
+                            writer.writeBytes("File does not exist :(");
                         }
                         Server.writeToLog(String.format("Checked for %s.", cmds[1]));
                         break;
