@@ -7,11 +7,12 @@
       repo_remote: origin
       repo_branch: master
       git_directory: /home/dphuang2
-      service_path: ansible/aystemd/ece428.service
+      service_path: ansible/systemd/ece428.service
       service_directory: /usr/lib/systemd/system/
       java_main_class: Server
   tasks:
       - name: get the code
         git: repo={{repo_url}} dest={{git_directory}}/{{repo_name}} version={{repo_branch}}
       - name: install systemd service
+        become: yes
         command: "cp {{git_directory}}/{{repo_name}}/{{service_path}} {{service_directory}}"
