@@ -1,0 +1,7 @@
+---
+- hosts: introducer:connect
+  gather_facts: no
+  tasks:
+      - name: stop server
+        become: yes
+        shell: systemctl stop mp2

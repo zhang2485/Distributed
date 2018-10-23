@@ -1,0 +1,10 @@
+[Unit]
+Description=mp2
+
+[Service]
+WorkingDirectory=/home/dphuang2/mp2
+ExecStart=/usr/bin/env java Server
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target
