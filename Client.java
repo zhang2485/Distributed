@@ -44,8 +44,15 @@ public class Client {
             }
         } else if (components.length == 3) {
             if (components[0].equals("put") || components[0].equals("get")) {
+                if (components[0].equals("put")) {
+                    if (!FileHandler.fileExists(components[1])) {
+                        System.out.print("File does not exist!\n");
+                        return ret;
+                    }
+                }
                 ret = cmd;
             }
+
         }
         return ret;
     }
@@ -56,11 +63,11 @@ public class Client {
             System.out.println("Quitting...");
             System.exit(0);
         }
+        System.out.printf("================= %s =================\n", cmd);
         if (!commands.contains(cmds[0]) && checkCommand(cmd).equals("INVALID")) {
             System.out.printf("Type a valid command from %s%n", commands.toString());
             return;
         }
-        System.out.printf("================= %s =================\n", cmd);
         if (cmd.equals("store")) {
             FileHandler.printFiles();
         } else {
@@ -98,7 +105,6 @@ public class Client {
  */
 class queryThread extends Thread implements Runnable {
 
-
     private String ip;
     private int port;
     private String[] components;
@@ -131,10 +137,9 @@ class queryThread extends Thread implements Runnable {
                 case "put":
                     String localfilename = components[1];
                     String sdfsfilename = components[2];
-                    if (FileHandler.fileExists(localfilename))
-                        FileHandler.sendFile(localfilename, sdfsfilename, socket);
-                    else
-                        sb.append(String.format("Local file did not exist: %s\n", localfilename));
+                    System.out.print("File sending!\n");
+                    FileHandler.sendFile(localfilename, sdfsfilename, socket);
+                    System.out.print("File sent!\n");
                     break;
                 default:
                     // Do nothing

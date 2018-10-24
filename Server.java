@@ -265,7 +265,7 @@ public class Server {
                     receives a file from the clinet
                      */
                     case "put":
-                        writeToLog(String.format("Received put command: %s -> %s", cmds[1], cmds[2]));
+                        writeToLog(String.format("Received put command: '%s'", cmd));
                         FileHandler.receiveFile(cmds[2], acceptSocket);
                         break;
                     default:
