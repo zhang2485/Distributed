@@ -258,13 +258,15 @@ public class Server {
                         } else {
                             writer.writeBytes("File not found...");
                         }
-                        Server.writeToLog(String.format("Checked for %s.", cmds[1]));
+                        writeToLog(String.format("Checked for %s.", cmds[1]));
                         break;
                     /*
                     put:
                     receives a file from the clinet
                      */
                     case "put":
+                        writeToLog(String.format("Received put command: %s -> %s", cmds[1], cmds[2]));
+                        FileHandler.receiveFile(cmds[2], acceptSocket);
                         break;
                     default:
                         writeToLog(String.format("Received invalid command: %s", cmds[0]));

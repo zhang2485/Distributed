@@ -124,11 +124,20 @@ class queryThread extends Thread implements Runnable {
             sb.append(String.format("%s\n", ip));
 
             // Send command to server
+            writer.writeBytes(cmd);
+
+            // Handle commands
             switch (components[0]) {
                 case "put":
-                    FileHandler.sendFile(components[1], components[2], socket);
+                    String localfilename = components[1];
+                    String sdfsfilename = components[2];
+                    if (FileHandler.fileExists(localfilename))
+                        FileHandler.sendFile(localfilename, sdfsfilename, socket);
+                    else
+                        sb.append(String.format("Local file did not exist: %s\n", localfilename));
+                    break;
                 default:
-                    writer.writeBytes(cmd);
+                    // Do nothing
                     break;
             }
 
@@ -141,7 +150,7 @@ class queryThread extends Thread implements Runnable {
                 System.out.println(sb.toString());
             }
         } catch (IOException e) {
-            System.out.printf("Could not query to %s\n", ip);
+            System.out.printf("Could not query to %s due to %s\n", ip, e.getMessage());
         }
     }
 }

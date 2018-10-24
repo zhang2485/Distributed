@@ -22,9 +22,9 @@ public class FileHandler {
         return false;
     }
 
-    static void sendFile(String localfilename, String sdfsfilename, Socket socket) throws FileNotFoundException, IOException {
+    static void sendFile(String localfilename, String sdfsfilename, Socket socket) throws IOException {
         // Capture file
-        File file = new File(localfilename);
+        File file = new File(String.format("%s/%s", System.getProperty(DIRECTORY), localfilename));
 
         // Collect streams
         BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
