@@ -1,15 +1,11 @@
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.Socket;
 import java.util.*;
 
 public class Client {
 
     private static final int SERVER_PORT = 2017;
-    private static final String[] serverList = {
+    static final String[] serverList = {
             "fa18-cs425-g77-01.cs.illinois.edu",
             "fa18-cs425-g77-02.cs.illinois.edu",
             "fa18-cs425-g77-03.cs.illinois.edu",
@@ -66,13 +62,8 @@ public class Client {
         }
         System.out.printf("================= %s =================\n", cmd);
         if (cmd.equals("store")) {
-            File directory = new File(System.getProperty("user.dir"));
-            File[] files = directory.listFiles();
-            for (File f : files) {
-                System.out.println(f.getName());
-            }
+            FileHandler.printFiles();
         } else {
-
             ArrayList<queryThread> threads = new ArrayList<>();
             for (String server : serverList) {
                 queryThread thread = new queryThread(server, SERVER_PORT, cmd);
@@ -107,15 +98,18 @@ public class Client {
  */
 class queryThread extends Thread implements Runnable {
 
-    private String cmd;
+
     private String ip;
     private int port;
+    private String[] components;
     private Socket socket;
     private BufferedReader reader;
     private DataOutputStream writer;
+    private String cmd;
 
-    queryThread(String ip, int port, String cmd) throws IOException {
+    public queryThread(String ip, int port, String cmd) throws IOException {
         this.cmd = String.format("%s\n", cmd);
+        this.components = cmd.split(" ");
         this.ip = ip;
         this.port = port;
     }
@@ -126,13 +120,19 @@ class queryThread extends Thread implements Runnable {
             socket = new Socket(ip, port);
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             writer = new DataOutputStream(socket.getOutputStream());
-
-            // Send command to server
-            writer.writeBytes(cmd);
-
-            // Read response from server
             StringBuilder sb = new StringBuilder();
             sb.append(String.format("%s\n", ip));
+
+            // Send command to server
+            switch (components[0]) {
+                case "put":
+                    FileHandler.sendFile(components[1], components[2], socket);
+                default:
+                    writer.writeBytes(cmd);
+                    break;
+            }
+
+            // Read response from server
             String line;
             while ((line = reader.readLine()) != null)
                 sb.append(String.format("%s\n", line));

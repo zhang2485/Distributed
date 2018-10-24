@@ -176,27 +176,8 @@ public class Server {
         }
     }
 
-    /**
-     * Checks if fileName exists in current working vm directory
-     *
-     * @param fileName
-     * @return
-     */
-
-    private static boolean fileExists(String fileName) {
-        File directory = new File(System.getProperty("user.dir"));
-        File[] files = directory.listFiles();
-        for (File f : files) {
-            if (f.getName().equals(fileName)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public static void main(String args[]) throws IOException, InterruptedException {
         setupServer();
-
         // Now that the server is setup, we can handle inputs from the client for commands
         String cmd;
         String[] cmds;
@@ -272,18 +253,23 @@ public class Server {
                      checks if file exists on VM
                      */
                     case "ls":
-                        if (fileExists(cmds[1])) {
+                        if (FileHandler.fileExists(cmds[1])) {
                             writer.writeBytes("File found!");
                         } else {
-                            writer.writeBytes("File does not exist :(");
+                            writer.writeBytes("File not found...");
                         }
                         Server.writeToLog(String.format("Checked for %s.", cmds[1]));
+                        break;
+                    /*
+                    put:
+                    receives a file from the clinet
+                     */
+                    case "put":
                         break;
                     default:
                         writeToLog(String.format("Received invalid command: %s", cmds[0]));
                         break;
                 }
-
                 acceptSocket.close();
             } catch (IOException e) {
                 e.printStackTrace();
