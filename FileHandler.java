@@ -46,13 +46,13 @@ public class FileHandler {
         // Collect streams
         BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(getFilePath(sdfsfilename)));
         BufferedInputStream bis = new BufferedInputStream(socket.getInputStream());
-        Server.writeToLog('Collected streams');
+        Server.writeToLog("Collected streams");
 
         // Receive and write to file
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
         while ((count = bis.read(buffer)) > 0) {
-            Server.writeToLog(buffer);
+            Server.writeToLog(buffer.toString());
             bos.write(buffer, 0, count);
         }
     }
