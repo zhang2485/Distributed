@@ -26,34 +26,43 @@ public class FileHandler {
         return String.format("%s/%s", System.getProperty(DIRECTORY), filename);
     }
 
-    static void sendFile(String localfilename, String sdfsfilename, Socket socket) throws IOException {
-        // Collect streams
-        BufferedInputStream bis = new BufferedInputStream(new FileInputStream(getFilePath(localfilename)));
-        DataOutputStream os = new DataOutputStream(socket.getOutputStream());
+    static void sendFile(String localfilename, Socket socket) throws IOException {
+        // Get size of file in bytes
+        File file = new File(getFilePath(localfilename));
+        DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+        dos.writeLong(file.length());
 
-        // Notify server of the file that is about to be sent
-        os.writeBytes("put " + localfilename + " " + sdfsfilename);
+        // Instantiate streams
+        BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
+        BufferedOutputStream bos = new BufferedOutputStream(socket.getOutputStream());
 
         // Send the file
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
         while ((count = bis.read(buffer)) > 0) {
-            os.write(buffer, 0, count);
+            bos.write(buffer, 0, count);
+            bos.flush();
         }
     }
 
     static void receiveFile(String sdfsfilename, Socket socket) throws IOException {
-        // Collect streams
+        // Instantiate streams
         BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(getFilePath(sdfsfilename)));
         BufferedInputStream bis = new BufferedInputStream(socket.getInputStream());
-        Server.writeToLog("Collected streams");
+        DataInputStream dis = new DataInputStream(socket.getInputStream());
+        long numBytes = dis.readLong();
 
         // Receive and write to file
-        int count;
         byte[] buffer = new byte[BUFFER_SIZE];
-        while ((count = bis.read(buffer)) > 0) {
-            Server.writeToLog(buffer.toString());
+        while (numBytes > 0) {
+            Server.writeToLog(String.format("%d bytes left to accept", numBytes));
+
+            // Read data from stream
+            int count = bis.read(buffer);
+            numBytes -= count;
             bos.write(buffer, 0, count);
+            bos.flush();
         }
+        Server.writeToLog("Finished writing to file");
     }
 }

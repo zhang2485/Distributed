@@ -17,6 +17,9 @@ public class Client {
             "fa18-cs425-g77-09.cs.illinois.edu",
             "fa18-cs425-g77-10.cs.illinois.edu"
     };
+//    static final String[] serverList = {
+//            "localhost",
+//    };
     private static HashSet<String> commands = new HashSet<>(Arrays.asList(
             "grep",
             "exit",
@@ -132,14 +135,11 @@ class queryThread extends Thread implements Runnable {
             // Send command to server
             writer.writeBytes(cmd);
 
-            // Handle commands
+            // Handle extra logic needed by commands
             switch (components[0]) {
                 case "put":
                     String localfilename = components[1];
-                    String sdfsfilename = components[2];
-                    System.out.print("File sending!\n");
-                    FileHandler.sendFile(localfilename, sdfsfilename, socket);
-                    System.out.print("File sent!\n");
+                    FileHandler.sendFile(localfilename, socket);
                     break;
                 default:
                     // Do nothing

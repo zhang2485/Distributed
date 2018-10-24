@@ -262,11 +262,15 @@ public class Server {
                         break;
                     /*
                     put:
-                    receives a file from the clinet
+                    receives a file from the client
                      */
                     case "put":
                         writeToLog(String.format("Received put command: '%s'", cmd));
                         FileHandler.receiveFile(cmds[2], acceptSocket);
+
+                        // Send ACK back
+                        writer.writeBytes("Successfully received file\n");
+                        Server.writeToLog("Sent ACK back to sender");
                         break;
                     default:
                         writeToLog(String.format("Received invalid command: %s", cmds[0]));
