@@ -27,41 +27,31 @@ public class FileHandler {
     }
 
     static void sendFile(String localfilename, Socket socket) throws IOException {
-        // Get size of file in bytes
-        File file = new File(getFilePath(localfilename));
-        DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
-        dos.writeLong(file.length());
-
         // Instantiate streams
-        BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
-        BufferedOutputStream bos = new BufferedOutputStream(socket.getOutputStream());
+        File file = new File(getFilePath(localfilename));
+        FileInputStream in = new FileInputStream(file);
+        OutputStream out = socket.getOutputStream();
 
         // Send the file
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
-        while ((count = bis.read(buffer)) > 0) {
-            bos.write(buffer, 0, count);
-            bos.flush();
+        while ((count = in.read(buffer)) > 0) {
+            out.write(buffer, 0, count);
         }
+        System.out.println("Sent file");
     }
 
     static void receiveFile(String sdfsfilename, Socket socket) throws IOException {
         // Instantiate streams
-        BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(getFilePath(sdfsfilename)));
-        BufferedInputStream bis = new BufferedInputStream(socket.getInputStream());
-        DataInputStream dis = new DataInputStream(socket.getInputStream());
-        long numBytes = dis.readLong();
+        FileOutputStream out = new FileOutputStream(getFilePath(sdfsfilename));
+        InputStream in = socket.getInputStream();
+        Server.writeToLog("Instantiated streams");
 
         // Receive and write to file
+        int count;
         byte[] buffer = new byte[BUFFER_SIZE];
-        while (numBytes > 0) {
-            Server.writeToLog(String.format("%d bytes left to accept", numBytes));
-
-            // Read data from stream
-            int count = bis.read(buffer);
-            numBytes -= count;
-            bos.write(buffer, 0, count);
-            bos.flush();
+        while ((count = in.read(buffer)) > 0) {
+            out.write(buffer, 0, count);
         }
         Server.writeToLog("Finished writing to file");
     }

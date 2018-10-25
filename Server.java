@@ -8,6 +8,7 @@ import java.nio.file.Files;
 
 public class Server {
     static final String IP_DELIMITER = " ";
+//    private static final String INTRODUCER_IP = "192.168.1.14";
     private static final String INTRODUCER_IP = "172.22.156.255";
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ss.SSS");
     private static final int SERVER_PORT = 2017;
@@ -15,7 +16,7 @@ public class Server {
     volatile static ArrayList<String> group = new ArrayList<>();
     private volatile static HashMap<String, String> connectTimes = new HashMap<>();
     private static ServerSocket serverSocket;
-    private static String machine;
+    static String machine;
     private static FileWriter log;
 
     private static ArrayList<String> removeDuplicatesAndSort(ArrayList<String> list) {
@@ -25,7 +26,7 @@ public class Server {
         return ret;
     }
 
-    private static ArrayList<String> logGrep(String pattern, String logFileName) {
+    static ArrayList<String> logGrep(String pattern, String logFileName) {
         ArrayList<String> res = null;
         try {
             pattern = pattern.trim();
@@ -58,7 +59,7 @@ public class Server {
         return arr;
     }
 
-    private static String readFile(String path, Charset encoding) throws IOException {
+    static String readFile(String path, Charset encoding) throws IOException {
         byte[] encoded = Files.readAllBytes(Paths.get(path));
         return new String(encoded, encoding);
     }
@@ -71,7 +72,7 @@ public class Server {
         return InetAddress.getLocalHost().getHostAddress();
     }
 
-    private static String getLogFileName() {
+    static String getLogFileName() {
         return String.format("%s.log", machine);
     }
 
@@ -178,110 +179,118 @@ public class Server {
 
     public static void main(String args[]) throws IOException, InterruptedException {
         setupServer();
-        // Now that the server is setup, we can handle inputs from the client for commands
-        String cmd;
-        String[] cmds;
         serverSocket = new ServerSocket(SERVER_PORT);
         while (true) {
             writeToLog("Looking for new connection on server");
-            Socket acceptSocket = serverSocket.accept();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(acceptSocket.getInputStream()));
-            DataOutputStream writer = new DataOutputStream(acceptSocket.getOutputStream());
-            cmd = reader.readLine();
-            cmds = cmd.split(" ");
-            try {
-                switch (cmds[0]) {
-                    /*
-                     *  print:
-                     *  This command prints out the current membership list on every available server
-                     */
-                    case "print":
-                        writer.writeBytes(String.format("My ID is: %s\n", ip));
-                        writer.writeBytes(String.format("%d members are in my group\n", Server.group.size()));
-                        for (String server : Server.group)
-                            writer.writeBytes(String.format("%s\n", server));
-                        writeToLog("Sent membership list to client");
-                        break;
-                    /*
-                     *  grep:
-                     *  execute a grep command on the log file and send back the grep results
-                     */
-                    case "grep":
-                        if (cmds.length < 2) {
-                            writeToLog("grep command did not have the right arguments");
-                            continue;
-                        }
-                        // Extract pattern
-                        int patternStart = cmd.indexOf(" ");
-                        ArrayList<String> res = logGrep(cmd.substring(patternStart + 1), getLogFileName());
-                        writer.writeBytes(String.join("\n", res));
-                        writeToLog("Sent grep output to client");
-                        break;
-                    /*
-                     *  quit:
-                     *  exits if I was commanded to quit, else update my membership list
-                     */
-                    case "quit":
-                        if (cmds.length < 2) {
-                            writeToLog("quit command did not have the right arguments");
-                            continue;
-                        }
-                        String quitter = cmds[1];
-                        if (ip.equals(quitter)) {
-                            System.exit(0);
-                        } else {
-                            removeFromMemberList(quitter);
-                        }
-                        Server.writeToLog(String.format("%s naturally exited.", quitter));
-                        break;
+            ServerResponseThread srt = new ServerResponseThread(serverSocket.accept());
+            srt.run();
+        }
+    }
+}
+
+class ServerResponseThread extends Thread {
+    private Socket socket;
+
+    public ServerResponseThread(Socket socket) {
+        this.socket = socket;
+    }
+
+    @Override
+    public void run() {
+        try {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            DataOutputStream writer = new DataOutputStream(socket.getOutputStream());
+            String cmd = reader.readLine();
+            String[] cmds = cmd.split(" ");
+            switch (cmds[0]) {
+                /*
+                 *  print:
+                 *  This command prints out the current membership list on every available server
+                 */
+                case "print":
+                    writer.writeBytes(String.format("My ID is: %s\n", Server.ip));
+                    writer.writeBytes(String.format("%d members are in my group\n", Server.group.size()));
+                    for (String server : Server.group)
+                        writer.writeBytes(String.format("%s\n", server));
+                    Server.writeToLog("Sent membership list to client");
+                    break;
+                /*
+                 *  grep:
+                 *  execute a grep command on the log file and send back the grep results
+                 */
+                case "grep":
+                    if (cmds.length < 2) {
+                        Server.writeToLog("grep command did not have the right arguments");
+                        return;
+                    }
+                    // Extract pattern
+                    int patternStart = cmd.indexOf(" ");
+                    ArrayList<String> res = Server.logGrep(cmd.substring(patternStart + 1), Server.getLogFileName());
+                    writer.writeBytes(String.join("\n", res));
+                    Server.writeToLog("Sent grep output to client");
+                    break;
+                /*
+                 *  quit:
+                 *  exits if I was commanded to quit, else update my membership list
+                 */
+                case "quit":
+                    if (cmds.length < 2) {
+                        Server.writeToLog("quit command did not have the right arguments");
+                        return;
+                    }
+                    String quitter = cmds[1];
+                    if (Server.ip.equals(quitter)) {
+                        System.exit(0);
+                    } else {
+                        Server.removeFromMemberList(quitter);
+                    }
+                    Server.writeToLog(String.format("%s naturally exited.", quitter));
+                    break;
                     /*
                     log:
                     sends back the log of a specific ip address
                      */
-                    case "log":
-                        if (cmds.length < 2) {
-                            writeToLog("log command did not have the right arguments");
-                            continue;
-                        }
-                        if (ip.equals(cmds[1]) || machine.equals(cmds[1])) {
-                            String fileContents = readFile(getLogFileName(), Charset.forName("UTF-8"));
-                            writer.writeBytes(fileContents);
-                        }
-                        break;
+                case "log":
+                    if (cmds.length < 2) {
+                        Server.writeToLog("log command did not have the right arguments");
+                        return;
+                    }
+                    if (Server.ip.equals(cmds[1]) || Server.machine.equals(cmds[1])) {
+                        String fileContents = Server.readFile(Server.getLogFileName(), Charset.forName("UTF-8"));
+                        writer.writeBytes(fileContents);
+                    }
+                    break;
                     /*
                      ls:
                      checks if file exists on VM
                      */
-                    case "ls":
-                        if (FileHandler.fileExists(cmds[1])) {
-                            writer.writeBytes("File found!");
-                        } else {
-                            writer.writeBytes("File not found...");
-                        }
-                        writeToLog(String.format("Checked for %s.", cmds[1]));
-                        break;
+                case "ls":
+                    if (FileHandler.fileExists(cmds[1])) {
+                        writer.writeBytes("File found!");
+                    } else {
+                        writer.writeBytes("File not found...");
+                    }
+                    Server.writeToLog(String.format("Checked for %s.", cmds[1]));
+                    break;
                     /*
                     put:
                     receives a file from the client
                      */
-                    case "put":
-                        writeToLog(String.format("Received put command: '%s'", cmd));
-                        FileHandler.receiveFile(cmds[2], acceptSocket);
-
-                        // Send ACK back
-                        writer.writeBytes("Successfully received file\n");
-                        Server.writeToLog("Sent ACK back to sender");
-                        break;
-                    default:
-                        writeToLog(String.format("Received invalid command: %s", cmds[0]));
-                        break;
-                }
-                acceptSocket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+                case "put":
+                    Server.writeToLog(String.format("Received put command: '%s'", cmd));
+                    FileHandler.receiveFile(cmds[2], socket);
+                    break;
+                default:
+                    Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));
+                    break;
             }
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+
     }
+
 }
 
 class MyThread extends Thread {

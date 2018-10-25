@@ -140,7 +140,12 @@ class queryThread extends Thread implements Runnable {
                 case "put":
                     String localfilename = components[1];
                     FileHandler.sendFile(localfilename, socket);
-                    break;
+                    socket.close(); // Closing the socket signals that the file is finished sending
+                    sb.append("File sent!");
+                    synchronized (System.out) {
+                        System.out.println(sb.toString());
+                    }
+                    return;
                 default:
                     // Do nothing
                     break;
