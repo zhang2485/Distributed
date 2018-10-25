@@ -30,7 +30,10 @@ public class FileHandler {
         // Instantiate streams
         File file = new File(getFilePath(localfilename));
         FileInputStream in = new FileInputStream(file);
-        OutputStream out = socket.getOutputStream();
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+
+        long numBytes = file.length();
+        out.writeLong(numBytes);
 
         // Send the file
         int count;
@@ -38,20 +41,24 @@ public class FileHandler {
         while ((count = in.read(buffer)) > 0) {
             out.write(buffer, 0, count);
         }
-        System.out.println("Sent file");
     }
 
     static void receiveFile(String sdfsfilename, Socket socket) throws IOException {
         // Instantiate streams
         FileOutputStream out = new FileOutputStream(getFilePath(sdfsfilename));
-        InputStream in = socket.getInputStream();
+        DataInputStream in = new DataInputStream(socket.getInputStream());
         Server.writeToLog("Instantiated streams");
+
+        long numBytes = in.readLong();
 
         // Receive and write to file
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
         while ((count = in.read(buffer)) > 0) {
             out.write(buffer, 0, count);
+            numBytes -= count;
+            if (numBytes == 0)
+                break;
         }
         Server.writeToLog("Finished writing to file");
     }
