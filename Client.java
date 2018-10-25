@@ -133,18 +133,15 @@ class queryThread extends Thread implements Runnable {
             sb.append(String.format("%s\n", ip));
 
             // Send command to server
-            writer.writeBytes(cmd);
+            writer.writeUTF(cmd);
 
             // Handle extra logic needed by commands
             switch (components[0]) {
                 case "put":
                     String localfilename = components[1];
                     FileHandler.sendFile(localfilename, socket);
-                    sb.append(String.format("Sent file: %s", localfilename));
-                    synchronized (System.out) {
-                        System.out.println(sb.toString());
-                    }
-                    return;
+                    sb.append(String.format("Sent file: %s\n", localfilename));
+                    break;
                 default:
                     // Do nothing
                     break;

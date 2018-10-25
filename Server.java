@@ -198,9 +198,10 @@ class ServerResponseThread extends Thread {
     @Override
     public void run() {
         try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            DataInputStream reader = new DataInputStream(socket.getInputStream());
             DataOutputStream writer = new DataOutputStream(socket.getOutputStream());
-            String cmd = reader.readLine();
+            String cmd = reader.readUTF().trim();
+            Server.writeToLog(String.format("Got command: %s", cmd));
             String[] cmds = cmd.split(" ");
             switch (cmds[0]) {
                 /*
@@ -279,6 +280,8 @@ class ServerResponseThread extends Thread {
                 case "put":
                     Server.writeToLog(String.format("Received put command: '%s'", cmd));
                     FileHandler.receiveFile(cmds[2], socket);
+
+                    writer.writeBytes("File received ACK");
                     break;
                 default:
                     Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));
