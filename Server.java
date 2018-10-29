@@ -184,6 +184,7 @@ public class Server {
             writeToLog("Looking for new connection on server");
             ServerResponseThread srt = new ServerResponseThread(serverSocket.accept());
             srt.run();
+            srt.join(); // Handle connections sequentially to achieve total ordering!
         }
     }
 }
@@ -247,10 +248,10 @@ class ServerResponseThread extends Thread {
                     }
                     Server.writeToLog(String.format("%s naturally exited.", quitter));
                     break;
-                    /*
-                    log:
-                    sends back the log of a specific ip address
-                     */
+                /*
+                log:
+                sends back the log of a specific ip address
+                 */
                 case "log":
                     if (cmds.length < 2) {
                         Server.writeToLog("log command did not have the right arguments");
@@ -261,10 +262,10 @@ class ServerResponseThread extends Thread {
                         writer.writeBytes(fileContents);
                     }
                     break;
-                    /*
-                     ls:
-                     checks if file exists on VM
-                     */
+                /*
+                 ls:
+                 checks if file exists on VM
+                 */
                 case "ls":
                     if (FileHandler.fileExists(cmds[1])) {
                         writer.writeBytes("File found!");
@@ -273,15 +274,23 @@ class ServerResponseThread extends Thread {
                     }
                     Server.writeToLog(String.format("Checked for %s.", cmds[1]));
                     break;
-                    /*
-                    put:
-                    receives a file from the client
-                     */
+                /*
+                put:
+                receives a file from the client
+                 */
                 case "put":
                     Server.writeToLog(String.format("Received put command: '%s'", cmd));
                     FileHandler.receiveFile(cmds[2], socket);
-
                     writer.writeBytes("File received ACK");
+                    break;
+                /*
+                get:
+                sends a file to the client
+                 */
+                case "get":
+                    Server.writeToLog(String.format("Received get command: '%s'", cmd));
+                    FileHandler.sendFile(cmds[1], socket);
+                    Server.writeToLog(String.format("Sent file: %s", cmds[1]));
                     break;
                 default:
                     Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));

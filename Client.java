@@ -138,10 +138,15 @@ class queryThread extends Thread implements Runnable {
             // Handle extra logic needed by commands
             switch (components[0]) {
                 case "put":
-                    String localfilename = components[1];
-                    FileHandler.sendFile(localfilename, socket);
-                    sb.append(String.format("Sent file: %s\n", localfilename));
+                    FileHandler.sendFile(components[1], socket);
                     break;
+                case "get":
+                    FileHandler.receiveFile(components[2], socket);
+                    sb.append("Received file!\n");
+                    synchronized (System.out) {
+                        System.out.println(sb.toString());
+                    }
+                    return;
                 default:
                     // Do nothing
                     break;
@@ -155,6 +160,7 @@ class queryThread extends Thread implements Runnable {
             synchronized (System.out) {
                 System.out.println(sb.toString());
             }
+
         } catch (IOException e) {
             System.out.printf("Could not query to %s due to %s\n", ip, e.getMessage());
         }

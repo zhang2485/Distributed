@@ -26,9 +26,9 @@ public class FileHandler {
         return String.format("%s/%s", System.getProperty(DIRECTORY), filename);
     }
 
-    static void sendFile(String localfilename, Socket socket) throws IOException {
+    static void sendFile(String filename, Socket socket) throws IOException {
         // Instantiate streams
-        File file = new File(getFilePath(localfilename));
+        File file = new File(getFilePath(filename));
         FileInputStream in = new FileInputStream(file);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
@@ -43,11 +43,10 @@ public class FileHandler {
         }
     }
 
-    static void receiveFile(String sdfsfilename, Socket socket) throws IOException {
+    static void receiveFile(String filename, Socket socket) throws IOException {
         // Instantiate streams
-        FileOutputStream out = new FileOutputStream(getFilePath(sdfsfilename));
+        FileOutputStream out = new FileOutputStream(getFilePath(filename));
         DataInputStream in = new DataInputStream(socket.getInputStream());
-        Server.writeToLog("Instantiated streams");
 
         long numBytes = in.readLong();
 
@@ -60,6 +59,5 @@ public class FileHandler {
             if (numBytes == 0)
                 break;
         }
-        Server.writeToLog("Finished writing to file");
     }
 }
