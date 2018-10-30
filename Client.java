@@ -5,21 +5,21 @@ import java.util.*;
 public class Client {
 
     private static final int SERVER_PORT = 2017;
-    static final String[] serverList = {
-            "fa18-cs425-g77-01.cs.illinois.edu",
-            "fa18-cs425-g77-02.cs.illinois.edu",
-            "fa18-cs425-g77-03.cs.illinois.edu",
-            "fa18-cs425-g77-04.cs.illinois.edu",
-            "fa18-cs425-g77-05.cs.illinois.edu",
-            "fa18-cs425-g77-06.cs.illinois.edu",
-            "fa18-cs425-g77-07.cs.illinois.edu",
-            "fa18-cs425-g77-08.cs.illinois.edu",
-            "fa18-cs425-g77-09.cs.illinois.edu",
-            "fa18-cs425-g77-10.cs.illinois.edu"
-    };
 //    static final String[] serverList = {
-//            "localhost",
+//            "fa18-cs425-g77-01.cs.illinois.edu",
+//            "fa18-cs425-g77-02.cs.illinois.edu",
+//            "fa18-cs425-g77-03.cs.illinois.edu",
+//            "fa18-cs425-g77-04.cs.illinois.edu",
+//            "fa18-cs425-g77-05.cs.illinois.edu",
+//            "fa18-cs425-g77-06.cs.illinois.edu",
+//            "fa18-cs425-g77-07.cs.illinois.edu",
+//            "fa18-cs425-g77-08.cs.illinois.edu",
+//            "fa18-cs425-g77-09.cs.illinois.edu",
+//            "fa18-cs425-g77-10.cs.illinois.edu"
 //    };
+    static final String[] serverList = {
+            "localhost",
+    };
     private static HashSet<String> commands = new HashSet<>(Arrays.asList(
             "grep",
             "exit",
@@ -34,6 +34,7 @@ public class Client {
     ));
     private static String lastInput;
 
+    // Checks the input string against our dictionary of existing commands
     public static String checkCommand(String cmd) {
         String ret = "INVALID";
         String[] components = cmd.split(" ");
@@ -47,15 +48,8 @@ public class Client {
             }
         } else if (components.length == 3) {
             if (components[0].equals("put") || components[0].equals("get")) {
-                if (components[0].equals("put")) {
-                    if (!FileHandler.fileExists(components[1])) {
-                        System.out.print("File does not exist!\n");
-                        return ret;
-                    }
-                }
                 ret = cmd;
             }
-
         }
         return ret;
     }
@@ -138,13 +132,23 @@ class queryThread extends Thread implements Runnable {
             // Handle extra logic needed by commands
             switch (components[0]) {
                 case "put":
-                    FileHandler.sendFile(components[1], socket, 0);
+                    try {
+                        FileHandler.sendFile(components[1], socket, 0);
+                    } catch (IOException e) {
+                        System.out.printf("File does not exist on local sdfs\n");
+                    }
                     break;
                 case "get":
-                    FileHandler.receiveFile(components[2], socket, false);
-                    sb.append("Received file!\n");
-                    synchronized (System.out) {
-                        System.out.println(sb.toString());
+                    try {
+                        FileHandler.receiveFile(components[2], socket, false);
+                        sb.append("Received file!\n");
+                        synchronized (System.out) {
+                            System.out.println(sb.toString());
+                        }
+                    } catch (IOException e) {
+                        // File did not exist on the remote sdfs so lets cleanup the instantiated file
+                        FileHandler.deleteFile(components[2]);
+                        System.out.printf("File did not exist on remote sdfs\n");
                     }
                     return;
                 default:

@@ -11,6 +11,14 @@ public class FileHandler {
         return directory.listFiles();
     }
 
+    static String getMasterNodeIP() {
+        return Server.group.get(0);
+    }
+
+    static int getFileNode(String filename) {
+        return filename.hashCode() % Server.group.size();
+    }
+
     static void printFiles() {
         for (File f : getFiles())
             System.out.println(f.getName());
@@ -24,7 +32,7 @@ public class FileHandler {
     }
 
     static String getFilePath(String filename) {
-        return String.format("%s/%s", System.getProperty(DIRECTORY), filename);
+        return String.format("%s/sdfs/%s", System.getProperty(DIRECTORY), filename);
     }
 
     static void truncateFile(File file, long numBytes) throws IOException {
@@ -90,26 +98,24 @@ public class FileHandler {
         return tmpFile;
     }
 
-    static boolean sendFile(String filename, Socket socket, int version) throws IOException {
+    static void deleteFile(String filename) {
+        new File(getFilePath(filename)).delete();
+    }
+
+    static void sendFile(String filename, Socket socket, int version) throws IOException {
         // Instantiate streams
-        try {
-            File file = getVersionContent(new File(getFilePath(filename)), version);
-            FileInputStream in = new FileInputStream(file);
-            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+        File file = getVersionContent(new File(getFilePath(filename)), version);
+        FileInputStream in = new FileInputStream(file);
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
-            long numBytes = file.length();
-            out.writeLong(numBytes);
+        long numBytes = file.length();
+        out.writeLong(numBytes);
 
-            // Send the file
-            int count;
-            byte[] buffer = new byte[BUFFER_SIZE];
-            while ((count = in.read(buffer)) > 0) {
-                out.write(buffer, 0, count);
-            }
-
-            return true;
-        } catch (IOException e) {
-            return false;
+        // Send the file
+        int count;
+        byte[] buffer = new byte[BUFFER_SIZE];
+        while ((count = in.read(buffer)) > 0) {
+            out.write(buffer, 0, count);
         }
     }
 

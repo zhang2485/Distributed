@@ -8,9 +8,9 @@ import java.nio.file.Files;
 
 public class Server {
     static final String IP_DELIMITER = " ";
-//    private static final String INTRODUCER_IP = "192.168.1.14";
+    private static final String INTRODUCER_IP = "192.168.1.12";
 //    private static final String INTRODUCER_IP = "10.195.57.170";
-    private static final String INTRODUCER_IP = "172.22.156.255";
+//    private static final String INTRODUCER_IP = "172.22.156.255";
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ss.SSS");
     private static final int SERVER_PORT = 2017;
     volatile static String ip;
@@ -290,9 +290,15 @@ class ServerResponseThread extends Thread {
                  */
                 case "get":
                     Server.writeToLog(String.format("Received get command: '%s'", cmd));
-                    int versions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
-                    FileHandler.sendFile(cmds[1], socket, versions);
-                    Server.writeToLog(String.format("Sent file: %s", cmds[1]));
+                    try {
+                        int versions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
+                        FileHandler.sendFile(cmds[1], socket, versions);
+                        Server.writeToLog(String.format("Sent file: %s", cmds[1]));
+                    } catch (IOException e) {
+                        // If we could not find the file on our sdfs, then simply close socket to signal DNE
+                        socket.close();
+                        Server.writeToLog(String.format("File did not exist: %s", cmds[1]));
+                    }
                     break;
                 default:
                     Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));
