@@ -123,7 +123,9 @@ public class FileHandler {
         FileOutputStream out = new FileOutputStream(getFilePath(filename), true);
         DataInputStream in = new DataInputStream(socket.getInputStream());
 
+        Server.writeToLog("Waiting for numBytes");
         long numBytes = in.readLong();
+        Server.writeToLog(String.format("Got numBytes: %d", numBytes));
 
         // Receive and write to file
         int count;
