@@ -12,7 +12,7 @@ public class Server {
 //    private static final String INTRODUCER_IP = "10.195.57.170";
 //    private static final String INTRODUCER_IP = "172.22.156.255";
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ss.SSS");
-    private static final int SERVER_PORT = 2017;
+    public static final int SERVER_PORT = 2017;
     volatile static String ip;
     volatile static ArrayList<String> group = new ArrayList<>();
     private volatile static HashMap<String, String> connectTimes = new HashMap<>();
@@ -281,8 +281,12 @@ class ServerResponseThread extends Thread {
                  */
                 case "put":
                     Server.writeToLog(String.format("Received put command: '%s'", cmd));
-                    FileHandler.receiveFile(cmds[2], socket, true);
-                    writer.writeBytes("File received ACK");
+                    try {
+                        FileHandler.receiveFile(cmds[2], socket, true);
+                        writer.writeBytes("File received ACK");
+                    } catch (IOException e) {
+                        Server.writeToLog("File did not exist on the local host");
+                    }
                     break;
                 /*
                 get:

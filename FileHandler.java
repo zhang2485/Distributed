@@ -2,12 +2,13 @@ import java.io.*;
 import java.net.Socket;
 
 public class FileHandler {
-    static final String DIRECTORY = "user.dir";
+    static final String USER_DIR = "user.dir";
+    static final String SDFS_DIR = "sdfs";
     static final int BUFFER_SIZE  = 2048;
     static final byte[] DELIMITER = { (byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF };
 
     static File[] getFiles() {
-        File directory = new File(System.getProperty(DIRECTORY));
+        File directory = new File(getDirectoryPath());
         return directory.listFiles();
     }
 
@@ -31,8 +32,16 @@ public class FileHandler {
         return false;
     }
 
+    static String getDirectoryPath() {
+        return String.format("%s/%s", System.getProperty(USER_DIR), SDFS_DIR);
+    }
+
     static String getFilePath(String filename) {
-        return String.format("%s/sdfs/%s", System.getProperty(DIRECTORY), filename);
+        return String.format("%s/%s", getDirectoryPath(), filename);
+    }
+
+    static void deleteFile(String filename) {
+        new File(getFilePath(filename)).delete();
     }
 
     static void truncateFile(File file, long numBytes) throws IOException {
@@ -94,12 +103,9 @@ public class FileHandler {
                 }
             }
         }
+        in.close();
         if (ranIntoDelimiter) truncateFile(tmpFile, DELIMITER.length);
         return tmpFile;
-    }
-
-    static void deleteFile(String filename) {
-        new File(getFilePath(filename)).delete();
     }
 
     static void sendFile(String filename, Socket socket, int version) throws IOException {
@@ -109,6 +115,8 @@ public class FileHandler {
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
         long numBytes = file.length();
+        // Handle empty files by throwing an exception
+        if (numBytes <= 0) throw new IOException();
         out.writeLong(numBytes);
 
         // Send the file

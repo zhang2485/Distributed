@@ -4,7 +4,6 @@ import java.util.*;
 
 public class Client {
 
-    private static final int SERVER_PORT = 2017;
 //    static final String[] serverList = {
 //            "fa18-cs425-g77-01.cs.illinois.edu",
 //            "fa18-cs425-g77-02.cs.illinois.edu",
@@ -70,7 +69,7 @@ public class Client {
         } else {
             ArrayList<queryThread> threads = new ArrayList<>();
             for (String server : serverList) {
-                queryThread thread = new queryThread(server, SERVER_PORT, cmd);
+                queryThread thread = new queryThread(server, Server.SERVER_PORT, cmd);
                 thread.start();
                 threads.add(thread);
             }
@@ -136,11 +135,13 @@ class queryThread extends Thread implements Runnable {
                         FileHandler.sendFile(components[1], socket, 0);
                     } catch (IOException e) {
                         System.out.printf("File does not exist on local sdfs\n");
+                        FileHandler.deleteFile(components[1]);
+                        socket.close();
                     }
                     break;
                 case "get":
                     try {
-                        FileHandler.receiveFile(components[2], socket, false);
+                        FileHandler.receiveFile(components[2], socket, true);
                         sb.append("Received file!\n");
                         synchronized (System.out) {
                             System.out.println(sb.toString());
