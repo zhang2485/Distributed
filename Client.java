@@ -138,7 +138,7 @@ class queryThread extends Thread implements Runnable {
             // Handle extra logic needed by commands
             switch (components[0]) {
                 case "put":
-                    FileHandler.sendFile(components[1], socket);
+                    FileHandler.sendFile(components[1], socket, 0);
                     break;
                 case "get":
                     FileHandler.receiveFile(components[2], socket);
