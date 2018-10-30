@@ -41,8 +41,6 @@ JC = javac
 CLASSES = \
 	  Server.java \
 	  Client.java \
-	  Clientv2.java \
-	  Serverv2.java \
 	  FileHandler.java \
 
 
