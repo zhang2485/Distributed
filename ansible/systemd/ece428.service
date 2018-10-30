@@ -3,7 +3,7 @@ Description=ece428
 
 [Service]
 WorkingDirectory=/home/dphuang2/ece428
-ExecStart=/usr/bin/env java Server
+ExecStart=/usr/bin/env java Server(v2)
 SuccessExitStatus=143
 
 [Install]
