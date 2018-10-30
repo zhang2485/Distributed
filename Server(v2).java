@@ -34,9 +34,15 @@ class FileHandler {
     static void sendFile(String filename, Socket socket) throws IOException {
         // Instantiate streams
         File file = new File(getFilePath(filename));
-        FileInputStream in = new FileInputStream(file);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-
+        if(!file.exists()) {
+        	String dne = "DNE";
+        	byte[] buff = dne.getBytes();
+        	out.write(buff, 0, buff.length);
+        	out.close();
+        	return;
+        }
+        FileInputStream in = new FileInputStream(file);
         long numBytes = file.length();
         out.writeLong(numBytes);
 
@@ -46,6 +52,7 @@ class FileHandler {
         while ((count = in.read(buffer)) > 0) {
             out.write(buffer, 0, count);
         }
+        in.close();
     }
 
     static void receiveFile(String filename, Socket socket) throws IOException {
