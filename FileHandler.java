@@ -66,6 +66,13 @@ public class FileHandler {
         return versions;
     }
 
+    /*
+    getVersionContent:
+    returns a temporary file that contains the contents of the specified version of the file. This temp file
+    can be used to send data to another node. Uses a 32 bit delimiter specified in the constant "DELIMITER".
+    To handle the delimiter, each byte must be read one by one until a sequence of 4 bytes matches the delimiter.
+    The purpose of the 32 bit delimiter is to be extremely robust in the content that this versioning system handles.
+     */
     static File getVersionContent(File file, int version) throws IOException {
         byte[] singleByteBuffer = new byte[1];
         int delimiterIdx = 0;
