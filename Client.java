@@ -141,7 +141,7 @@ class queryThread extends Thread implements Runnable {
                     FileHandler.sendFile(components[1], socket, 0);
                     break;
                 case "get":
-                    FileHandler.receiveFile(components[2], socket);
+                    FileHandler.receiveFile(components[2], socket, false);
                     sb.append("Received file!\n");
                     synchronized (System.out) {
                         System.out.println(sb.toString());

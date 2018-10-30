@@ -281,7 +281,7 @@ class ServerResponseThread extends Thread {
                  */
                 case "put":
                     Server.writeToLog(String.format("Received put command: '%s'", cmd));
-                    FileHandler.receiveFile(cmds[2], socket);
+                    FileHandler.receiveFile(cmds[2], socket, true);
                     writer.writeBytes("File received ACK");
                     break;
                 /*

@@ -5,7 +5,6 @@ public class FileHandler {
     static final String DIRECTORY = "user.dir";
     static final int BUFFER_SIZE  = 2048;
     static final byte[] DELIMITER = { (byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF };
-    static final String TMP_FOLDER = "/tmp";
 
     static File[] getFiles() {
         File directory = new File(System.getProperty(DIRECTORY));
@@ -26,10 +25,6 @@ public class FileHandler {
 
     static String getFilePath(String filename) {
         return String.format("%s/%s", System.getProperty(DIRECTORY), filename);
-    }
-
-    static String getTmpFilePath(String filename) {
-        return String.format("%s/%s", TMP_FOLDER, filename);
     }
 
     static void truncateFile(File file, long numBytes) throws IOException {
@@ -73,8 +68,9 @@ public class FileHandler {
         }
 
         // Read until the next delimiter while writing to tmp file
-        String tmpFilePath = getTmpFilePath(file.getName());
-        FileOutputStream out = new FileOutputStream(tmpFilePath);
+        File tmpFile = File.createTempFile(file.getName(), "");
+        tmpFile.deleteOnExit();
+        FileOutputStream out = new FileOutputStream(tmpFile);
         int numBytes;
         boolean ranIntoDelimiter = false;
         delimiterIdx = 0;
@@ -90,7 +86,6 @@ public class FileHandler {
                 }
             }
         }
-        File tmpFile = new File(tmpFilePath);
         if (ranIntoDelimiter) truncateFile(tmpFile, DELIMITER.length);
         return tmpFile;
     }
@@ -112,20 +107,17 @@ public class FileHandler {
                 out.write(buffer, 0, count);
             }
 
-            file.delete();
             return true;
         } catch (IOException e) {
             return false;
         }
     }
 
-    static void receiveFile(String filename, Socket socket) throws IOException {
-        FileOutputStream out = new FileOutputStream(getFilePath(filename), true);
+    static void receiveFile(String filename, Socket socket, boolean append) throws IOException {
+        FileOutputStream out = new FileOutputStream(getFilePath(filename), append);
         DataInputStream in = new DataInputStream(socket.getInputStream());
 
-        Server.writeToLog("Waiting for numBytes");
         long numBytes = in.readLong();
-        Server.writeToLog(String.format("Got numBytes: %d", numBytes));
 
         // Receive and write to file
         int count;
@@ -135,6 +127,7 @@ public class FileHandler {
             if ((numBytes -= count) == 0)
                 break;
         }
-        out.write(DELIMITER, 0, DELIMITER.length);
+        if (append)
+            out.write(DELIMITER, 0, DELIMITER.length);
     }
 }
