@@ -4,21 +4,21 @@ import java.util.*;
 
 public class Client {
 
-//    static final String[] serverList = {
-//            "fa18-cs425-g77-01.cs.illinois.edu",
-//            "fa18-cs425-g77-02.cs.illinois.edu",
-//            "fa18-cs425-g77-03.cs.illinois.edu",
-//            "fa18-cs425-g77-04.cs.illinois.edu",
-//            "fa18-cs425-g77-05.cs.illinois.edu",
-//            "fa18-cs425-g77-06.cs.illinois.edu",
-//            "fa18-cs425-g77-07.cs.illinois.edu",
-//            "fa18-cs425-g77-08.cs.illinois.edu",
-//            "fa18-cs425-g77-09.cs.illinois.edu",
-//            "fa18-cs425-g77-10.cs.illinois.edu"
-//    };
     static final String[] serverList = {
-            "localhost",
+            "fa18-cs425-g77-01.cs.illinois.edu",
+            "fa18-cs425-g77-02.cs.illinois.edu",
+            "fa18-cs425-g77-03.cs.illinois.edu",
+            "fa18-cs425-g77-04.cs.illinois.edu",
+            "fa18-cs425-g77-05.cs.illinois.edu",
+            "fa18-cs425-g77-06.cs.illinois.edu",
+            "fa18-cs425-g77-07.cs.illinois.edu",
+            "fa18-cs425-g77-08.cs.illinois.edu",
+            "fa18-cs425-g77-09.cs.illinois.edu",
+            "fa18-cs425-g77-10.cs.illinois.edu"
     };
+//    static final String[] serverList = {
+//            "localhost",
+//    };
     private static HashSet<String> commands = new HashSet<>(Arrays.asList(
             "grep",
             "exit",
