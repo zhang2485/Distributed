@@ -110,7 +110,6 @@ public class FileHandler {
                 }
             }
         }
-        in.close();
         if (ranIntoDelimiter) truncateFile(tmpFile, DELIMITER.length);
         return tmpFile;
     }
