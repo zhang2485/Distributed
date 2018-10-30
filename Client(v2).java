@@ -2,7 +2,7 @@ import java.io.*;
 import java.net.Socket;
 import java.util.*;
 
-class NoFileHandler {
+class clientFileHandler {
     static final String DIRECTORY = "user.dir";
     static final int BUFFER_SIZE  = 2048;
 
@@ -50,7 +50,7 @@ class NoFileHandler {
 
     static void receiveFile(String filename, Socket socket) throws IOException {
         // Instantiate streams
-        FileOutputStream out = new FileOutputStream(getFilePath(filename));
+        FileOutputStream out = null;
         DataInputStream in = new DataInputStream(socket.getInputStream());
 
         long numBytes = in.readLong();
@@ -58,7 +58,17 @@ class NoFileHandler {
         // Receive and write to file
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
+        boolean first = true;
         while ((count = in.read(buffer)) > 0) {
+        	if(first) {
+        		first = false;
+        		String check = new String(buffer);
+        		if(check.trim().equals("DNE")) {
+        			System.out.println("DNE SUCCEEDED");
+        			break;
+        		}
+        		out = new FileOutputStream(getFilePath(filename));
+        	}
             out.write(buffer, 0, count);
             numBytes -= count;
             if (numBytes == 0)
@@ -206,7 +216,7 @@ class queryThread extends Thread implements Runnable {
                     FileHandler.sendFile(components[1], socket);
                     break;
                 case "get":
-                    FileHandler.receiveFile(components[2], socket);
+                    clientFileHandler.receiveFile(components[2], socket);
                     sb.append("Received file!\n");
                     synchronized (System.out) {
                         System.out.println(sb.toString());
