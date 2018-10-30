@@ -9,7 +9,7 @@ import java.nio.file.Files;
 class FileHandler {
     static final String DIRECTORY = "user.dir";
     static final int BUFFER_SIZE  = 2048;
-
+    static final int MASTERPORT = 1234;
     static File[] getFiles() {
         File directory = new File(System.getProperty(DIRECTORY));
         return directory.listFiles();
@@ -31,9 +31,9 @@ class FileHandler {
         return String.format("%s/%s", System.getProperty(DIRECTORY), filename);
     }
 
-    static void sendFile(String localfilename, Socket socket) throws IOException {
+    static void sendFile(String filename, Socket socket) throws IOException {
         // Instantiate streams
-        File file = new File(getFilePath(localfilename));
+        File file = new File(getFilePath(filename));
         FileInputStream in = new FileInputStream(file);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
@@ -48,43 +48,70 @@ class FileHandler {
         }
     }
 
-    static void receiveFile(String sdfsfilename, Socket socket) throws IOException {
+    static void receiveFile(String filename, Socket socket) throws IOException {
         // Instantiate streams
-    	File f = new File(getFilePath(sdfsfilename));
-    	boolean exists = f.exists();
-        FileOutputStream out = new FileOutputStream(getFilePath(sdfsfilename), exists);
+        FileOutputStream out = new FileOutputStream(getFilePath(filename));
         DataInputStream in = new DataInputStream(socket.getInputStream());
-        Server.writeToLog("Instantiated streams");
 
         long numBytes = in.readLong();
 
         // Receive and write to file
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
-        if(exists) {
-        	String delimiter = "~";
-        	out.write(delimiter.getBytes(), 0, 1);
-        }
         while ((count = in.read(buffer)) > 0) {
             out.write(buffer, 0, count);
             numBytes -= count;
             if (numBytes == 0)
                 break;
         }
-        Server.writeToLog("Finished writing to file");
+        out.close();
+    }
+    
+    static void emptyPipe(String filename, Socket socket) throws IOException {
+        DataInputStream in = new DataInputStream(socket.getInputStream());
+        long numBytes = in.readLong();
+        int count;
+        byte[] buffer = new byte[BUFFER_SIZE];
+        while ((count = in.read(buffer)) > 0) {
+            numBytes -= count;
+            if (numBytes == 0)
+                break;
+        }
+    }
+    static void potentialFile(String filename, Socket socket) throws IOException {
+    	byte[] buf = new byte[2048];
+    	DatagramSocket sock = new DatagramSocket(MASTERPORT, InetAddress.getByName(Server.ip));
+        DatagramPacket packet = new DatagramPacket(buf, buf.length);
+        sock.setSoTimeout(0);
+        System.out.println("75");
+        sock.receive(packet);
+        System.out.println("76");
+        sock.close();
+        String selected = new String(buf);
+        System.out.println(selected);
+        Server.fileList.put(filename, selected);
+        if(selected.contains(Server.ip)) {
+        	receiveFile(filename, socket);
+        }
+        else {
+        	// Empty the pipe
+        	emptyPipe(filename, socket);
+        }
     }
 }
+
 
 
 public class Server {
     static final String IP_DELIMITER = " ";
 //    private static final String INTRODUCER_IP = "192.168.1.14";
-    private static final String INTRODUCER_IP = "172.22.156.255";
+    private static final String INTRODUCER_IP = "172.22.154.22";
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ss.SSS");
     private static final int SERVER_PORT = 2017;
     volatile static String ip;
     volatile static ArrayList<String> group = new ArrayList<>();
     private volatile static HashMap<String, String> connectTimes = new HashMap<>();
+    volatile static HashMap<String, String> fileList = new HashMap<>();
     private static ServerSocket serverSocket;
     static String machine;
     private static FileWriter log;
@@ -254,6 +281,7 @@ public class Server {
             writeToLog("Looking for new connection on server");
             ServerResponseThread srt = new ServerResponseThread(serverSocket.accept());
             srt.run();
+            srt.join(); // Handle connections sequentially to achieve total ordering!
         }
     }
 }
@@ -317,10 +345,10 @@ class ServerResponseThread extends Thread {
                     }
                     Server.writeToLog(String.format("%s naturally exited.", quitter));
                     break;
-                    /*
-                    log:
-                    sends back the log of a specific ip address
-                     */
+                /*
+                log:
+                sends back the log of a specific ip address
+                 */
                 case "log":
                     if (cmds.length < 2) {
                         Server.writeToLog("log command did not have the right arguments");
@@ -331,10 +359,10 @@ class ServerResponseThread extends Thread {
                         writer.writeBytes(fileContents);
                     }
                     break;
-                    /*
-                     ls:
-                     checks if file exists on VM
-                     */
+                /*
+                 ls:
+                 checks if file exists on VM
+                 */
                 case "ls":
                     if (FileHandler.fileExists(cmds[1])) {
                         writer.writeBytes("File found!");
@@ -343,43 +371,61 @@ class ServerResponseThread extends Thread {
                     }
                     Server.writeToLog(String.format("Checked for %s.", cmds[1]));
                     break;
-                    /*
-                    put:
-                    receives a file from the client
-                     */
+                /*
+                put:
+                receives a file from the client
+                 */
                 case "put":
                     Server.writeToLog(String.format("Received put command: '%s'", cmd));
-                    FileHandler.receiveFile(cmds[2], socket);
-                    writer.writeBytes("File received ACK");
+                    // The Master node will be index 1 in the membership list
+                    // Simple in design effective in accomplishing the task
+                    System.out.println(Server.group);
+                    System.out.println(Server.ip);
+                    if(Server.group.get(Server.group.size() - 1).trim().equals(Server.ip.trim())) {
+                    	List<String> temp = new ArrayList<String>(Server.group);
+                    	Collections.shuffle(temp);
+                    	temp = temp.subList(0, 4);
+                    	String chosen = String.join(",", temp);
+                        byte[] buf = chosen.getBytes();
+                        DatagramSocket sock = new DatagramSocket();
+                        for(int i = 0; i < Server.group.size(); i++) {
+	                        InetAddress IP = InetAddress.getByName(Server.group.get(i));
+	                        if(Server.group.get(i).equals(Server.ip.trim())) {
+	                        	continue;
+	                        }
+	                        DatagramPacket packet = new DatagramPacket(buf, buf.length, IP, 1234);
+	                        sock.send(packet);
+	                        System.out.println("389");
+	                        Thread.sleep(400);
+                        }
+                        sock.close();
+                        if(chosen.contains(Server.ip.trim())) {
+                        	FileHandler.receiveFile(cmds[2], socket);
+                        }
+                        else {
+                        	FileHandler.emptyPipe(cmds[2], socket);
+                        }
+                    }
+                    else {
+                    	FileHandler.potentialFile(cmds[2], socket);
+                    }
+                    writer.writeBytes("RECIEVED");
                     break;
-                    /*
-                    delete:
-                    deletes all versions including present one of a file in VMs
-                    */
-                case "delete":
-                   	File file = new File(cmds[1]);
-                   	if(file.delete()) {
-                   		writer.writeBytes(cmds[1] + " deleted.");
-                   	}
-                   	else {
-                   		writer.writeBytes("File Does Not Exist.");
-                   	}
-                   	Server.writeToLog(String.format("Deleted %s.", cmds[1]));
-                   	break;
-                    /*
-                    get:
-                    gets file from all VMs
-                    */
-                 case "get":
-                   	FileHandler.sendFile(cmds[1], socket);
-                   	writer.writeBytes("File sent ACK");
-                   	break;
+                /*
+                get:
+                sends a file to the client
+                 */
+                case "get":
+                    Server.writeToLog(String.format("Received get command: '%s'", cmd));
+                    FileHandler.sendFile(cmds[1], socket);
+                    Server.writeToLog(String.format("Sent file: %s", cmds[1]));
+                    break;
                 default:
                     Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));
                     break;
             }
             socket.close();
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
 
@@ -528,7 +574,7 @@ class ConnectThread extends MyThread implements Runnable {
  */
 class SocketHelper {
     static final int CONNECT_PORT = 2020;
-    static final int INTRODUCER_PORT = 2012;
+    static final int INTRODUCER_PORT = 2013;
     static final int PING_PORT = 2010;
     static final int ACK_PORT = 2011;
     Random random = new Random();
