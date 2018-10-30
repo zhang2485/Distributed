@@ -2,7 +2,7 @@ import java.io.*;
 import java.net.Socket;
 import java.util.*;
 
-class clientFileHandler {
+class NoFileHandler {
     static final String DIRECTORY = "user.dir";
     static final int BUFFER_SIZE  = 2048;
 
@@ -27,9 +27,9 @@ class clientFileHandler {
         return String.format("%s/%s", System.getProperty(DIRECTORY), filename);
     }
 
-    static void sendFile(String localfilename, Socket socket) throws IOException {
+    static void sendFile(String filename, Socket socket) throws IOException {
         // Instantiate streams
-        File file = new File(getFilePath(localfilename));
+        File file = new File(getFilePath(filename));
         FileInputStream in = new FileInputStream(file);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
@@ -41,14 +41,16 @@ class clientFileHandler {
         byte[] buffer = new byte[BUFFER_SIZE];
         while ((count = in.read(buffer)) > 0) {
             out.write(buffer, 0, count);
+            if(in.available() == 0) {
+            	  System.out.println("45");
+            	break;
+            }
         }
     }
 
-    static void receiveFile(String sdfsfilename, Socket socket) throws IOException {
+    static void receiveFile(String filename, Socket socket) throws IOException {
         // Instantiate streams
-    	File f = new File(getFilePath(sdfsfilename));
-    	boolean exists = f.exists();
-        FileOutputStream out = new FileOutputStream(getFilePath(sdfsfilename), exists);
+        FileOutputStream out = new FileOutputStream(getFilePath(filename));
         DataInputStream in = new DataInputStream(socket.getInputStream());
 
         long numBytes = in.readLong();
@@ -56,12 +58,7 @@ class clientFileHandler {
         // Receive and write to file
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
-        if(exists) {
-        	String delimiter = "~";
-        	out.write(delimiter.getBytes(), 0, delimiter.getBytes().length);
-        }
         while ((count = in.read(buffer)) > 0) {
-        	System.out.println((new String(buffer, "UTF-8")).indexOf('~'));
             out.write(buffer, 0, count);
             numBytes -= count;
             if (numBytes == 0)
@@ -116,7 +113,7 @@ public class Client {
         } else if (components.length == 3) {
             if (components[0].equals("put") || components[0].equals("get")) {
                 if (components[0].equals("put")) {
-                    if (!clientFileHandler.fileExists(components[1])) {
+                    if (!FileHandler.fileExists(components[1])) {
                         System.out.print("File does not exist!\n");
                         return ret;
                     }
@@ -206,14 +203,15 @@ class queryThread extends Thread implements Runnable {
             // Handle extra logic needed by commands
             switch (components[0]) {
                 case "put":
-                    String localfilename = components[1];
-                    FileHandler.sendFile(localfilename, socket);
-                    sb.append(String.format("Sent file: %s\n", localfilename));
+                    FileHandler.sendFile(components[1], socket);
                     break;
                 case "get":
-                	clientFileHandler.receiveFile(components[2], socket);
-                	sb.append(String.format("Received file: %s\n", components[2]));
-                	break;
+                    FileHandler.receiveFile(components[2], socket);
+                    sb.append("Received file!\n");
+                    synchronized (System.out) {
+                        System.out.println(sb.toString());
+                    }
+                    return;
                 default:
                     // Do nothing
                     break;
@@ -227,6 +225,7 @@ class queryThread extends Thread implements Runnable {
             synchronized (System.out) {
                 System.out.println(sb.toString());
             }
+
         } catch (IOException e) {
             System.out.printf("Could not query to %s due to %s\n", ip, e.getMessage());
         }
