@@ -127,6 +127,10 @@ public class Server {
                             ie.printStackTrace();
                         }
                     }
+                } else {
+                    if (Server.ip.equals(Server.group.get(i)) && FileHandler.fileExists(file.getName())) {
+                        FileHandler.deleteFile(file.getName());
+                    }
                 }
             }
         }
