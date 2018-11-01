@@ -113,6 +113,12 @@ public class Server {
                     Socket socket;
                     while(scanning) try {
                         socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
+                        Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
+                        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                        out.writeUTF(file.getName());
+                        Server.writeToLog(String.format("Sent %s to %s", file.getName(), Server.group.get(i)));
+                        FileHandler.sendFile(file, socket, -1); // Send entire file
+                        Server.writeToLog("Sent re-replication file");
                         scanning = false;
                     } catch (ConnectException e) {
                         try {
@@ -121,12 +127,6 @@ public class Server {
                             ie.printStackTrace();
                         }
                     }
-                    Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
-                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                    out.writeUTF(file.getName());
-                    Server.writeToLog(String.format("Sent %s to %s", file.getName(), Server.group.get(i)));
-                    FileHandler.sendFile(file, socket, -1); // Send entire file
-                    Server.writeToLog("Sent re-replication file");
                 }
             }
         }
