@@ -102,6 +102,23 @@ public class Server {
         logMemberList();
     }
 
+    static void reReplicateFiles() throws IOException {
+        Server.writeToLog("Re replicating files on my sdfs");
+        for (File file : FileHandler.getFiles()) {
+            Server.writeToLog(String.format("Re-replicating: %s", file.getName()));
+            for (int i = 0; i < Server.group.size(); i++) {
+                if (FileHandler.isReplicaNode(file.getName(), i)) {
+                    Server.writeToLog(String.format("Re-replicating %s on %s", file.getName(), Server.group.get(i)));
+                    Socket socket = new Socket(Server.group.get(i), FileHandler.REREPLICA_PORT);
+                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                    out.writeUTF(file.getName());
+                    FileHandler.sendFile(file, socket, -1); // Send entire file
+                    Server.writeToLog("Sent re-replication file");
+                }
+            }
+        }
+    }
+
     static void removeFromMemberList(String ip) throws IOException {
         int found = Server.group.indexOf(ip);
         if (found != -1) {
@@ -111,6 +128,7 @@ public class Server {
             writeToLog(String.format("Requested removal of members list for %s but it wasn't there", ip));
         }
         logMemberList();
+        reReplicateFiles();
     }
 
     static void updateMemberList(String[] newList) throws IOException {
@@ -126,6 +144,7 @@ public class Server {
             connectTimes.put(ip, date);
         }
         logMemberList();
+        reReplicateFiles();
     }
 
     private static void logMemberList() throws IOException {
@@ -142,6 +161,7 @@ public class Server {
         ip = getIPAddress();
         // FileWriter object contains instance to log file for server
         log = new FileWriter(new File(getLogFileName()));
+        System.setOut(new PrintStream(new FileOutputStream(getLogFileName(), true)));
         writeToLog(String.format("Attempting to start server at: %s", ip));
 
         if (ip.equals(INTRODUCER_IP)) {
@@ -172,6 +192,7 @@ public class Server {
                 String msg = SocketHelper.getStringFromPacket(packet);
                 updateMemberList(msg.split(Server.IP_DELIMITER));
                 new AckThread().start();
+                new ReReplicateReceiveThread().start();
                 new ConnectThread().start();
                 new PingThread().start();
             } catch (SocketTimeoutException e) {
@@ -345,6 +366,40 @@ class ServerResponseThread extends Thread {
             e.printStackTrace();
         }
 
+    }
+
+}
+
+class ReReplicateReceiveThread extends Thread {
+    ServerSocket serverSocket;
+
+    public ReReplicateReceiveThread() {
+        try {
+            serverSocket = new ServerSocket(FileHandler.REREPLICA_PORT);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                Socket socket = serverSocket.accept();
+                Server.writeToLog("Got connection for re-replication");
+                DataInputStream in = new DataInputStream(socket.getInputStream());
+                String filename = in.readUTF().trim();
+                Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
+                if (!FileHandler.fileExists(filename)) {
+                    FileHandler.receiveFile(filename, socket, false);
+                    Server.writeToLog(String.format("Saved re-replication file: %s", filename));
+                } else {
+                    Server.writeToLog(String.format("Re-replication file already exists: %s", filename));
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 }

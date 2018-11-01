@@ -8,6 +8,7 @@ public class FileHandler {
     static final String SDFS_DIR = "sdfs";
     static final int BUFFER_SIZE  = 2048;
     static final int REPLICA_PORT = 2018;
+    static final int REREPLICA_PORT = 5000;
     static final byte[] DELIMITER = { (byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF };
 
     static File[] getFiles() {
@@ -165,7 +166,12 @@ public class FileHandler {
 
     static void sendFile(File file, Socket socket, int version) throws IOException {
         // Instantiate streams
-        File fileVersion = getVersionContent(file, version);
+        File fileVersion;
+        if (version == -1) {
+            fileVersion = file;
+        } else {
+            fileVersion = getVersionContent(file, version);
+        }
         FileInputStream in = new FileInputStream(fileVersion);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
