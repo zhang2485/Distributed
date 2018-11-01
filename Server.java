@@ -343,6 +343,7 @@ class ServerResponseThread extends Thread {
                  */
                 case "delete":
                     FileHandler.deleteFile(cmds[1]);
+                    writer.writeBytes(String.format("Deleted %s", cmds[1]));
                     break;
                 default:
                     Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));
