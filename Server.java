@@ -111,7 +111,6 @@ public class Server {
             writeToLog(String.format("Requested removal of members list for %s but it wasn't there", ip));
         }
         logMemberList();
-        reReplicateFiles();
     }
 
     static void updateMemberList(String[] newList) throws IOException {
@@ -127,7 +126,6 @@ public class Server {
             connectTimes.put(ip, date);
         }
         logMemberList();
-        reReplicateFiles();
     }
 
     private static void logMemberList() throws IOException {
