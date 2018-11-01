@@ -388,6 +388,7 @@ class ReplicaMasterThread extends Thread {
         try {
             // Give the signal to either save or delete the temporary file
             for (int i = 0; i < Server.group.size(); i++) {
+                Server.writeToLog(String.format("Sending replica signal to %s", Server.group.get(i)));
                 FileHandler.sendReplicaSignal(Server.group.get(i), (FileHandler.isReplicaNode(this.filename, i)));
                 Server.writeToLog(String.format("Sent replica signal to %s", Server.group.get(i)));
             }
