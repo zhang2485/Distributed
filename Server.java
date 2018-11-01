@@ -284,21 +284,25 @@ class ServerResponseThread extends Thread {
                     try {
                         File tmpFile = File.createTempFile("", "");
                         FileHandler.receiveFile(tmpFile, socket, false);
+                        Server.writeToLog(String.format("Saved file to temp location: %s", tmpFile.getAbsolutePath()));
 
                         // Master node needs to coordinate where files go
                         ReplicaMasterThread master = null;
                         if (Server.ip == FileHandler.getMasterNodeIP()) {
                             master = new ReplicaMasterThread(cmds[2]);
                             master.start();
+                            Server.writeToLog("Started replica master thread");
                         }
 
                         // Receive signal to save or delete
                         ReplicaReceiveThread receive = new ReplicaReceiveThread(tmpFile, writer, cmds[2]);
                         receive.start();
+                        Server.writeToLog("Started replica receive thread");
 
                         try {
-                            master.join();
+                            if (master != null) master.join();
                             receive.join();
+                            Server.writeToLog("Replica threads finished");
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
@@ -354,10 +358,12 @@ class ReplicaReceiveThread extends Thread {
                 // Signaled to save
                 file.renameTo(new File(FileHandler.getFilePath(filename)));
                 writer.writeBytes("File saved ACK");
+                Server.writeToLog("Received replica signal to save");
             } else {
                 // Signaled to delete
                 file.delete();
                 writer.writeBytes("File deleted ACK");
+                Server.writeToLog("Received replica signal to delete");
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -378,6 +384,7 @@ class ReplicaMasterThread extends Thread {
             // Give the signal to either save or delete the temporary file
             for (int i = 0; i < Server.group.size(); i++) {
                 FileHandler.sendReplicaSignal(Server.group.get(i), (FileHandler.isReplicaNode(this.filename, i)));
+                Server.writeToLog(String.format("Sent replica signal to %s", Server.group.get(i)));
             }
         } catch (IOException e) {
             e.printStackTrace();
