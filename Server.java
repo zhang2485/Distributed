@@ -292,7 +292,7 @@ class ServerResponseThread extends Thread {
                         // Master node needs to coordinate where files go
                         Server.writeToLog(String.format("Master node is: %s and my ip is %s", FileHandler.getMasterNodeIP(), Server.ip));
                         ReplicaMasterThread master = null;
-                        if (Objects.equals(Server.ip, FileHandler.getMasterNodeIP())) {
+                        if (Server.ip.equals(FileHandler.getMasterNodeIP())) {
                             Server.writeToLog("I am the master node!");
                             master = new ReplicaMasterThread(cmds[2]);
                             master.start();
