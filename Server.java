@@ -289,6 +289,11 @@ class ServerResponseThread extends Thread {
                         FileHandler.receiveFile(tmpFile, socket, true);
                         Server.writeToLog(String.format("Saved file to temp location: %s", tmpFile.getAbsolutePath()));
 
+                        // Receive signal to save or delete
+                        ReplicaReceiveThread receive = new ReplicaReceiveThread(tmpFile, writer, cmds[2]);
+                        receive.start();
+                        Server.writeToLog("Started replica receive thread");
+
                         // Master node needs to coordinate where files go
                         Server.writeToLog(String.format("Master node is: %s and my ip is %s", FileHandler.getMasterNodeIP(), Server.ip));
                         ReplicaMasterThread master = null;
@@ -298,11 +303,6 @@ class ServerResponseThread extends Thread {
                             master.start();
                             Server.writeToLog("Started replica master thread");
                         }
-
-                        // Receive signal to save or delete
-                        ReplicaReceiveThread receive = new ReplicaReceiveThread(tmpFile, writer, cmds[2]);
-                        receive.start();
-                        Server.writeToLog("Started replica receive thread");
 
                         try {
                             if (master != null) master.join();
