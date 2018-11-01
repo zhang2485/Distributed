@@ -189,7 +189,6 @@ public class Server {
             writeToLog("Looking for new connection on server");
             ServerResponseThread srt = new ServerResponseThread(serverSocket.accept());
             srt.run();
-            srt.join(); // Handle connections sequentially to achieve total ordering!
         }
     }
 }
