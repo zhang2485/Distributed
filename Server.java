@@ -309,8 +309,6 @@ class ServerResponseThread extends Thread {
                             if (master != null) {
                                 master.join();
                                 Server.writeToLog("Master thread successfully joined");
-                            } else {
-                                Server.writeToLog("What?!");
                             }
                             receive.join();
                             Server.writeToLog("Replica threads finished");
@@ -399,7 +397,11 @@ class ReplicaMasterThread extends Thread {
                 Server.writeToLog(String.format("Sent replica signal to %s", Server.group.get(i)));
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            try {
+                Server.writeToLog(e.getMessage());
+            } catch (IOException ee) {
+                ee.printStackTrace();
+            }
         }
     }
 }
