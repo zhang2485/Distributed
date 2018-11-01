@@ -378,6 +378,7 @@ class FailureReplicaThread extends Thread {
     public FailureReplicaThread() {
         try {
             serverSocket = new ServerSocket(FileHandler.FAILURE_REPLICA_PORT);
+            Server.writeToLog("Instantiated failure replica receive server socket");
         } catch (IOException e) {
             e.printStackTrace();
         }
