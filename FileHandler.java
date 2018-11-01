@@ -29,8 +29,13 @@ public class FileHandler {
     }
 
     static boolean isReplicaNode(String filename, int idx) {
-        int nodeIdx = getNodeFromFile(filename);
-        return idx < ((nodeIdx + 4) % Server.group.size()) && idx >= nodeIdx;
+        int numReplicas = 4;
+        int lower = getNodeFromFile(filename);
+        int upper = (lower + numReplicas) % Server.group.size();
+        if (lower < upper) {
+            return idx >= lower && idx < upper;
+        }
+        return idx < upper || idx > lower;
     }
 
     static boolean fileExists(String filename) {
