@@ -148,8 +148,10 @@ class queryThread extends Thread implements Runnable {
                         }
                     } catch (IOException e) {
                         // File did not exist on the remote sdfs so lets cleanup the instantiated file
-                        FileHandler.deleteFile(components[2]);
-                        System.out.printf("File did not exist on remote sdfs\n");
+                        sb.append("File did not exist on remote sdfs\n");
+                        synchronized (System.out) {
+                            System.out.println(sb.toString());
+                        }
                     }
                     return;
                 default:
