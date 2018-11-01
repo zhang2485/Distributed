@@ -1,4 +1,5 @@
 import java.io.*;
+import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -62,9 +63,20 @@ public class FileHandler {
     }
 
     static void sendReplicaSignal(String ip, boolean signal) throws IOException {
-        Socket socket = new Socket(ip, REPLICA_PORT);
-        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        out.writeBoolean(signal);
+        boolean scanning = true;
+        Socket socket;
+        while(scanning) try {
+            socket = new Socket(ip, REPLICA_PORT);
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            out.writeBoolean(signal);
+            scanning = false;
+        } catch (ConnectException e) {
+            try {
+                Thread.sleep(2000); //2 seconds
+            } catch (InterruptedException ie) {
+                ie.printStackTrace();
+            }
+        }
     }
 
     static boolean receiveReplicaSignal() throws IOException {
