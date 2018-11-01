@@ -176,11 +176,11 @@ public class Server {
         log = new FileWriter(new File(getLogFileName()));
         System.setOut(new PrintStream(new FileOutputStream(getLogFileName(), true)));
         writeToLog(String.format("Attempting to start server at: %s", ip));
+        new FailureReplicaThread().start();
 
         if (ip.equals(INTRODUCER_IP)) {
             // If I am the introducer machine
             addToMemberList(ip);
-            new FailureReplicaThread().start();
             new AckThread().start();
             new IntroducerThread().start();
             new ConnectThread().start();
@@ -205,7 +205,6 @@ public class Server {
                 socket.close(); // Allow connect thread to open port at CONNECT_PORT
                 String msg = SocketHelper.getStringFromPacket(packet);
                 updateMemberList(msg.split(Server.IP_DELIMITER));
-                new FailureReplicaThread().start();
                 new AckThread().start();
                 new ConnectThread().start();
                 new PingThread().start();
