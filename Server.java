@@ -290,7 +290,7 @@ class ServerResponseThread extends Thread {
                         Server.writeToLog(String.format("Saved file to temp location: %s", tmpFile.getAbsolutePath()));
 
                         // Master node needs to coordinate where files go
-                        Server.writeToLog(String.format("Master node is: %s", FileHandler.getMasterNodeIP()));
+                        Server.writeToLog(String.format("Master node is: %s and my ip is %s", FileHandler.getMasterNodeIP(), Server.ip));
                         ReplicaMasterThread master = null;
                         if (Server.ip == FileHandler.getMasterNodeIP()) {
                             Server.writeToLog("I am the master node!");
