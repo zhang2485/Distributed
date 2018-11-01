@@ -109,7 +109,18 @@ public class Server {
             for (int i = 0; i < Server.group.size(); i++) {
                 if (FileHandler.isReplicaNode(file.getName(), i)) {
                     Server.writeToLog(String.format("Re-replicating %s on %s", file.getName(), Server.group.get(i)));
-                    Socket socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
+                    boolean scanning = true;
+                    Socket socket;
+                    while(scanning) try {
+                        socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
+                        scanning = false;
+                    } catch (ConnectException e) {
+                        try {
+                            Thread.sleep(2000); //2 seconds
+                        } catch (InterruptedException ie) {
+                            ie.printStackTrace();
+                        }
+                    }
                     Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
                     DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                     out.writeUTF(file.getName());
