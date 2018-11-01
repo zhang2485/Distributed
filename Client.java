@@ -4,7 +4,7 @@ import java.util.*;
 
 public class Client {
 
-    static final String[] serverList = {
+    private static final String[] serverList = {
             "fa18-cs425-g77-01.cs.illinois.edu",
             "fa18-cs425-g77-02.cs.illinois.edu",
             "fa18-cs425-g77-03.cs.illinois.edu",

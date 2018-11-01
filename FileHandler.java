@@ -1,10 +1,12 @@
 import java.io.*;
+import java.net.ServerSocket;
 import java.net.Socket;
 
 public class FileHandler {
     static final String USER_DIR = "user.dir";
     static final String SDFS_DIR = "sdfs";
     static final int BUFFER_SIZE  = 2048;
+    static final int REPLICA_PORT = 2018;
     static final byte[] DELIMITER = { (byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF };
 
     static File[] getFiles() {
@@ -16,13 +18,17 @@ public class FileHandler {
         return Server.group.get(0);
     }
 
-    static int getFileNode(String filename) {
+    static int getNodeFromFile(String filename) {
         return filename.hashCode() % Server.group.size();
     }
 
     static void printFiles() {
         for (File f : getFiles())
             System.out.println(f.getName());
+    }
+
+    static boolean isReplicaNode(String filename, int idx) {
+        return idx < (getNodeFromFile(filename) + 4) && idx >= getNodeFromFile(filename);
     }
 
     static boolean fileExists(String filename) {
@@ -42,6 +48,21 @@ public class FileHandler {
 
     static void deleteFile(String filename) {
         new File(getFilePath(filename)).delete();
+    }
+
+    static void sendReplicaSignal(String ip, boolean signal) throws IOException {
+        Socket socket = new Socket(ip, REPLICA_PORT);
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+        out.writeBoolean(signal);
+    }
+
+    static boolean receiveReplicaSignal() throws IOException {
+        ServerSocket serverSocket = new ServerSocket(REPLICA_PORT);
+        Socket socket = serverSocket.accept();
+        DataInputStream in = new DataInputStream(socket.getInputStream());
+        boolean signal = in.readBoolean();
+        serverSocket.close();
+        return signal;
     }
 
     static void truncateFile(File file, long numBytes) throws IOException {
@@ -114,13 +135,13 @@ public class FileHandler {
         return tmpFile;
     }
 
-    static void sendFile(String filename, Socket socket, int version) throws IOException {
+    static void sendFile(File file, Socket socket, int version) throws IOException {
         // Instantiate streams
-        File file = getVersionContent(new File(getFilePath(filename)), version);
-        FileInputStream in = new FileInputStream(file);
+        File fileVersion = getVersionContent(file, version);
+        FileInputStream in = new FileInputStream(fileVersion);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
-        long numBytes = file.length();
+        long numBytes = fileVersion.length();
         // Handle empty files by throwing an exception
         if (numBytes <= 0) throw new IOException();
         out.writeLong(numBytes);
@@ -133,8 +154,12 @@ public class FileHandler {
         }
     }
 
-    static void receiveFile(String filename, Socket socket, boolean append) throws IOException {
-        FileOutputStream out = new FileOutputStream(getFilePath(filename), append);
+    static void sendFile(String filename, Socket socket, int version) throws IOException {
+        sendFile(new File(getFilePath(filename)), socket, version);
+    }
+
+    static void receiveFile(File file, Socket socket, boolean append) throws IOException {
+        FileOutputStream out = new FileOutputStream(file, append);
         DataInputStream in = new DataInputStream(socket.getInputStream());
 
         long numBytes = in.readLong();
@@ -150,4 +175,9 @@ public class FileHandler {
         if (append)
             out.write(DELIMITER, 0, DELIMITER.length);
     }
+
+    static void receiveFile(String filename, Socket socket, boolean append) throws IOException {
+        receiveFile(new File(getFilePath(filename)), socket, append);
+    }
+
 }

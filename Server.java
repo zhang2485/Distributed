@@ -161,7 +161,7 @@ public class Server {
             SocketHelper socket = new SocketHelper(SocketHelper.CONNECT_PORT);
             socket.send(ip, INTRODUCER_IP, SocketHelper.INTRODUCER_PORT);
             try {
-                DatagramPacket packet = socket.receive(MyThread.PROTOCOL_PERIOD);
+                DatagramPacket packet = socket.receive(FailureDetectionThread.PROTOCOL_PERIOD);
 
                 // We have successfully confirmed introducer is available
                 socket.close(); // Allow connect thread to open port at CONNECT_PORT
@@ -277,15 +277,34 @@ class ServerResponseThread extends Thread {
                     break;
                 /*
                 put:
-                receives a file from the client
+                receives a file from the client.
                  */
                 case "put":
                     Server.writeToLog(String.format("Received put command: '%s'", cmd));
                     try {
-                        FileHandler.receiveFile(cmds[2], socket, true);
-                        writer.writeBytes("File received ACK");
+                        File tmpFile = File.createTempFile("", "");
+                        FileHandler.receiveFile(tmpFile, socket, false);
+
+                        // Master node needs to coordinate where files go
+                        ReplicaMasterThread master = null;
+                        if (Server.ip == FileHandler.getMasterNodeIP()) {
+                            master = new ReplicaMasterThread(cmds[2]);
+                            master.start();
+                        }
+
+                        // Receive signal to save or delete
+                        ReplicaReceiveThread receive = new ReplicaReceiveThread(tmpFile, writer, cmds[2]);
+                        receive.start();
+
+                        try {
+                            master.join();
+                            receive.join();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+
                     } catch (IOException e) {
-                        Server.writeToLog("File did not exist on the local host");
+                        Server.writeToLog("File did not exist on the local host so they closed socket");
                     }
                     break;
                 /*
@@ -317,7 +336,56 @@ class ServerResponseThread extends Thread {
 
 }
 
-class MyThread extends Thread {
+class ReplicaReceiveThread extends Thread {
+    File file;
+    String filename;
+    DataOutputStream writer;
+
+    public ReplicaReceiveThread(File file, DataOutputStream writer, String filename) {
+        this.file = file;
+        this.writer = writer;
+        this.filename = filename;
+    }
+
+    @Override
+    public void run() {
+        try {
+            if (FileHandler.receiveReplicaSignal()) {
+                // Signaled to save
+                file.renameTo(new File(FileHandler.getFilePath(filename)));
+                writer.writeBytes("File saved ACK");
+            } else {
+                // Signaled to delete
+                file.delete();
+                writer.writeBytes("File deleted ACK");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class ReplicaMasterThread extends Thread {
+    String filename;
+
+    public ReplicaMasterThread(String filename) {
+        this.filename = filename;
+    }
+
+    @Override
+    public void run() {
+        try {
+            // Give the signal to either save or delete the temporary file
+            for (int i = 0; i < Server.group.size(); i++) {
+                FileHandler.sendReplicaSignal(Server.group.get(i), (FileHandler.isReplicaNode(this.filename, i)));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class FailureDetectionThread extends Thread {
     public static final int[] neighbors = {-2, -1, 1, 2};
     static final int PROTOCOL_PERIOD = 400;
     static final int FAIL_TIME = 1000;
@@ -351,7 +419,7 @@ class MyThread extends Thread {
 
 }
 
-class AckThread extends MyThread implements Runnable {
+class AckThread extends FailureDetectionThread implements Runnable {
     @Override
     public void run() {
         try {
@@ -372,7 +440,7 @@ class AckThread extends MyThread implements Runnable {
     }
 }
 
-class PingThread extends MyThread implements Runnable {
+class PingThread extends FailureDetectionThread implements Runnable {
     private int i = 0;
 
     private String nextNeighbor() {
@@ -416,7 +484,7 @@ class PingThread extends MyThread implements Runnable {
     }
 }
 
-class IntroducerThread extends MyThread implements Runnable {
+class IntroducerThread extends FailureDetectionThread implements Runnable {
     @Override
     public void run() {
         try {
@@ -437,7 +505,7 @@ class IntroducerThread extends MyThread implements Runnable {
     }
 }
 
-class ConnectThread extends MyThread implements Runnable {
+class ConnectThread extends FailureDetectionThread implements Runnable {
     @Override
     public void run() {
         try {
@@ -497,6 +565,5 @@ class SocketHelper {
     void close() {
         socket.close();
     }
-
 }
 
