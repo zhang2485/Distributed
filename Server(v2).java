@@ -90,13 +90,12 @@ class FileHandler {
     	DatagramSocket sock = new DatagramSocket(MASTERPORT, InetAddress.getByName(Server.ip));
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
         sock.setSoTimeout(0);
-        System.out.println("75");
         sock.receive(packet);
-        System.out.println("76");
         sock.close();
         String selected = new String(buf);
         System.out.println(selected);
         Server.fileList.put(filename, selected);
+        System.out.println(Server.fileList);
         if(selected.contains(Server.ip)) {
         	receiveFile(filename, socket);
         }
@@ -203,6 +202,7 @@ public class Server {
     
     
     static void removeFromMemberList(String ip) throws IOException {
+    	ip = ip.trim();
         int found = Server.group.indexOf(ip);
         if (found != -1) {
             Server.group.remove(found);
@@ -212,14 +212,18 @@ public class Server {
         }
         // This will alert other nodes of need for replication (213) Master Node is last member of List
         if(Server.group.get(Server.group.size() - 1).equals(Server.ip)) {
+        	System.out.println("Searching for lost files");
+        	System.out.println(Server.fileList);
         	for(String k: Server.fileList.keySet()) {
         		// Look for files lost with loss of group member, list of members that contain the file
         		String list = Server.fileList.get(k);
+        		System.out.println(list);
+        		System.out.println(ip);
         		if(list.contains(ip)) {
         			List<String> temp = new ArrayList<String>(Server.group);
-        			int choice = (int) (Math.random() * (temp.size() - 1));
+        			int choice = (int) (Math.random() * (temp.size()));
         			while(list.contains(Server.group.get(choice))) {
-        				choice = (int) (Math.random() * (temp.size() - 1));
+        				choice = (int) (Math.random() * (temp.size()));
         			}
         			String [] str = list.split(",");
         			for(int i = 0; i < str.length; i++) {
@@ -228,6 +232,7 @@ public class Server {
         				}
         			}
         			String newFileList = String.join("," , str);
+        			System.out.println(newFileList);
         			for(String s: temp) {
         				Socket sendList = new Socket(s, 2048);
         				DataOutputStream out = new DataOutputStream(sendList.getOutputStream());
@@ -237,6 +242,7 @@ public class Server {
         			}
         		}
         	}
+        	System.out.println("Finished Searching");
         }
         logMemberList();
     }
@@ -303,6 +309,7 @@ public class Server {
                 new AckThread().start();
                 new ConnectThread().start();
                 new PingThread().start();
+                new fileThread().start();
             } catch (SocketTimeoutException e) {
                 //Introducer is inactive
                 writeToLog("Introducer is inactive");
@@ -421,7 +428,7 @@ class ServerResponseThread extends Thread {
                     if(Server.group.get(Server.group.size() - 1).trim().equals(Server.ip.trim())) {
                     	List<String> temp = new ArrayList<String>(Server.group);
                     	Collections.shuffle(temp);
-                    	temp = temp.subList(0, 4);
+                    	temp = temp.subList(0, 3);
                     	String chosen = String.join(",", temp);
                         byte[] buf = chosen.getBytes();
                         DatagramSocket sock = new DatagramSocket();
@@ -432,7 +439,6 @@ class ServerResponseThread extends Thread {
 	                        }
 	                        DatagramPacket packet = new DatagramPacket(buf, buf.length, IP, 1234);
 	                        sock.send(packet);
-	                        System.out.println("389");
 	                        Thread.sleep(600);
                         }
                         sock.close();
@@ -442,6 +448,7 @@ class ServerResponseThread extends Thread {
                         else {
                         	FileHandler.emptyPipe(cmds[2], socket);
                         }
+                        Server.fileList.put(cmds[2], chosen);
                     }
                     else {
                     	FileHandler.potentialFile(cmds[2], socket);
@@ -618,7 +625,7 @@ class fileThread extends MyThread implements Runnable {
 	
     @Override
     public void run() {
-    	
+    	System.out.println("fileThread");
         try {
             @SuppressWarnings("resource")
 			ServerSocket fileSocket = new ServerSocket(2048);
@@ -626,8 +633,10 @@ class fileThread extends MyThread implements Runnable {
 			ServerSocket receiveSocket = new ServerSocket(2049);
             while (true) {
             	Socket accepted = fileSocket.accept();
+            	System.out.println("Lost file signal");
             	BufferedReader reader = new BufferedReader(new InputStreamReader(accepted.getInputStream()));
             	String fileInfo = reader.readLine();
+            	System.out.println(fileInfo);
             	String [] membership = fileInfo.split(":");
             	String file = membership[0].trim();
             	String newMembers = membership[1].trim();
