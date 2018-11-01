@@ -171,6 +171,7 @@ public class Server {
             addToMemberList(ip);
             new AckThread().start();
             new IntroducerThread().start();
+            new FailureReplicaThread().start();
             new ConnectThread().start();
             new PingThread().start();
         } else {
