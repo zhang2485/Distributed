@@ -337,6 +337,13 @@ class ServerResponseThread extends Thread {
                         Server.writeToLog(String.format("File did not exist: %s", cmds[1]));
                     }
                     break;
+                /*
+                get:
+                sends a file to the client
+                 */
+                case "delete":
+                    FileHandler.deleteFile(cmds[1]);
+                    break;
                 default:
                     Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));
                     break;
