@@ -200,7 +200,8 @@ public class Server {
         writeToLog(String.format("Added %s to member list", ip));
         logMemberList();
     }
-
+    
+    
     static void removeFromMemberList(String ip) throws IOException {
         int found = Server.group.indexOf(ip);
         if (found != -1) {
@@ -208,6 +209,34 @@ public class Server {
             writeToLog(String.format("Removed %s from member list", ip));
         } else {
             writeToLog(String.format("Requested removal of members list for %s but it wasn't there", ip));
+        }
+        // This will alert other nodes of need for replication (213) Master Node is last member of List
+        if(Server.group.get(Server.group.size() - 1).equals(Server.ip)) {
+        	for(String k: Server.fileList.keySet()) {
+        		// Look for files lost with loss of group member, list of members that contain the file
+        		String list = Server.fileList.get(k);
+        		if(list.contains(ip)) {
+        			List<String> temp = new ArrayList<String>(Server.group);
+        			int choice = (int) (Math.random() * (temp.size() - 1));
+        			while(list.contains(Server.group.get(choice))) {
+        				choice = (int) (Math.random() * (temp.size() - 1));
+        			}
+        			String [] str = list.split(",");
+        			for(int i = 0; i < str.length; i++) {
+        				if(str[i].equals(ip)) {
+        					str[i] = Server.group.get(choice);
+        				}
+        			}
+        			String newFileList = String.join("," , str);
+        			for(String s: temp) {
+        				Socket sendList = new Socket(s, 2048);
+        				DataOutputStream out = new DataOutputStream(sendList.getOutputStream());
+        				out.writeBytes(k + ":" + newFileList);
+        				System.out.println(k + ":" + newFileList);
+        				sendList.close();
+        			}
+        		}
+        	}
         }
         logMemberList();
     }
@@ -250,6 +279,7 @@ public class Server {
             new IntroducerThread().start();
             new ConnectThread().start();
             new PingThread().start();
+            new fileThread().start();
         } else {
             /*
              *  The following section checks if the introducer machine is alive by pinging it,
@@ -403,7 +433,7 @@ class ServerResponseThread extends Thread {
 	                        DatagramPacket packet = new DatagramPacket(buf, buf.length, IP, 1234);
 	                        sock.send(packet);
 	                        System.out.println("389");
-	                        Thread.sleep(400);
+	                        Thread.sleep(600);
                         }
                         sock.close();
                         if(chosen.contains(Server.ip.trim())) {
@@ -497,7 +527,11 @@ class AckThread extends MyThread implements Runnable {
 
 class PingThread extends MyThread implements Runnable {
     private int i = 0;
-
+    public void replicateFiles(String failed) {
+    	for(int j = 0; j < Server.fileList.size(); j++) {
+    		
+    	}
+    }
     private String nextNeighbor() {
         i = (i + 1) % neighbors.length;
         int neighborIndex = (Server.group.indexOf(Server.ip) + neighbors[i]) % Server.group.size();
@@ -575,6 +609,56 @@ class ConnectThread extends MyThread implements Runnable {
         }
     }
 }
+
+/**
+ * This thread is used for recieving new file membership lists, and sending Files over if applicable
+ * (615)
+ */
+class fileThread extends MyThread implements Runnable {
+	
+    @Override
+    public void run() {
+    	
+        try {
+            @SuppressWarnings("resource")
+			ServerSocket fileSocket = new ServerSocket(2048);
+            @SuppressWarnings("resource")
+			ServerSocket receiveSocket = new ServerSocket(2049);
+            while (true) {
+            	Socket accepted = fileSocket.accept();
+            	BufferedReader reader = new BufferedReader(new InputStreamReader(accepted.getInputStream()));
+            	String fileInfo = reader.readLine();
+            	String [] membership = fileInfo.split(":");
+            	String file = membership[0].trim();
+            	String newMembers = membership[1].trim();
+            	File f = new File(file);
+            	if(f.exists()) {
+            		System.out.println("I have the file, I will now try to replicate.");
+            		String origList = Server.fileList.get(file);
+            		String [] newMem = newMembers.split(",");
+            		for(int i = 0; i < newMem.length; i++) {
+            			if(!origList.contains(newMem[i].trim())) {
+            				// We'll send the file to the new participant in the membership list
+            				Socket sock = new Socket(newMem[i], 2049);
+            				FileHandler.sendFile(file, sock);
+            				sock.close();
+            			}
+            		}
+            	}
+            	if(!f.exists() && newMembers.contains(Server.ip)) {
+            		// new member list
+            		Socket fileReceiver = receiveSocket.accept();
+            		FileHandler.receiveFile(file, fileReceiver);
+            		fileReceiver.close();
+            	}
+            	Server.fileList.put(file, newMembers);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
 
 /**
  * Contains a helper functions for UDP programming
