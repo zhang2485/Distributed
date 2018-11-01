@@ -106,7 +106,53 @@ class FileHandler {
     }
 }
 
+class signalThread extends MyThread implements Runnable {
+	
+	String ip;
+	public signalThread(String ip) {
+		this.ip = ip;
+	}
+    @Override
+    public void run() {
+    	System.out.println("Searching for lost files");
+    	System.out.println(Server.fileList);
+    	for(String k: Server.fileList.keySet()) {
+    		// Look for files lost with loss of group member, list of members that contain the file
+    		String list = Server.fileList.get(k);
+    		System.out.println(list);
+    		System.out.println(ip);
+    		if(list.contains(ip)) {
+    			List<String> temp = new ArrayList<String>(Server.group);
+    			int choice = (int) (Math.random() * (temp.size()));
+    			while(list.contains(Server.group.get(choice))) {
+    				choice = (int) (Math.random() * (temp.size()));
+    			}
+    			String [] str = list.split(",");
+    			for(int i = 0; i < str.length; i++) {
+    				if(str[i].equals(ip)) {
+    					str[i] = Server.group.get(choice);
+    				}
+    			}
+    			String newFileList = String.join("," , str);
+    			System.out.println(newFileList);
+    			for(String s: temp) {
+    				Socket sendList;
+					try {
+						sendList = new Socket(s, 2048);
+	    				DataOutputStream out = new DataOutputStream(sendList.getOutputStream());
+	    				out.writeBytes(k + ":" + newFileList);
+	    				System.out.println(k + ":" + newFileList);
+	    				sendList.close();
+					} catch (IOException e) {
+						
+					}
 
+    			}
+    		}
+    	}
+    	System.out.println("Finished Searching");
+    }
+}
 
 public class Server {
     static final String IP_DELIMITER = " ";
@@ -203,6 +249,7 @@ public class Server {
     
     static void removeFromMemberList(String ip) throws IOException {
     	ip = ip.trim();
+    	System.out.println("REMOVED NODE " + ip);
         int found = Server.group.indexOf(ip);
         if (found != -1) {
             Server.group.remove(found);
@@ -212,37 +259,7 @@ public class Server {
         }
         // This will alert other nodes of need for replication (213) Master Node is last member of List
         if(Server.group.get(Server.group.size() - 1).equals(Server.ip)) {
-        	System.out.println("Searching for lost files");
-        	System.out.println(Server.fileList);
-        	for(String k: Server.fileList.keySet()) {
-        		// Look for files lost with loss of group member, list of members that contain the file
-        		String list = Server.fileList.get(k);
-        		System.out.println(list);
-        		System.out.println(ip);
-        		if(list.contains(ip)) {
-        			List<String> temp = new ArrayList<String>(Server.group);
-        			int choice = (int) (Math.random() * (temp.size()));
-        			while(list.contains(Server.group.get(choice))) {
-        				choice = (int) (Math.random() * (temp.size()));
-        			}
-        			String [] str = list.split(",");
-        			for(int i = 0; i < str.length; i++) {
-        				if(str[i].equals(ip)) {
-        					str[i] = Server.group.get(choice);
-        				}
-        			}
-        			String newFileList = String.join("," , str);
-        			System.out.println(newFileList);
-        			for(String s: temp) {
-        				Socket sendList = new Socket(s, 2048);
-        				DataOutputStream out = new DataOutputStream(sendList.getOutputStream());
-        				out.writeBytes(k + ":" + newFileList);
-        				System.out.println(k + ":" + newFileList);
-        				sendList.close();
-        			}
-        		}
-        	}
-        	System.out.println("Finished Searching");
+        	new signalThread(ip).start();
         }
         logMemberList();
     }
