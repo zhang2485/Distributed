@@ -8,7 +8,7 @@ public class FileHandler {
     static final String SDFS_DIR = "sdfs";
     static final int BUFFER_SIZE  = 2048;
     static final int REPLICA_PORT = 2018;
-    static final int REREPLICA_PORT = 5000;
+    static final int FAILURE_REPLICA_PORT = 5000;
     static final byte[] DELIMITER = { (byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF };
 
     static File[] getFiles() {

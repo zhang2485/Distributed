@@ -103,15 +103,17 @@ public class Server {
     }
 
     static void reReplicateFiles() throws IOException {
-        Server.writeToLog("Re replicating files on my sdfs");
+        Server.writeToLog("Re-replicating files on my sdfs");
         for (File file : FileHandler.getFiles()) {
             Server.writeToLog(String.format("Re-replicating: %s", file.getName()));
             for (int i = 0; i < Server.group.size(); i++) {
                 if (FileHandler.isReplicaNode(file.getName(), i)) {
                     Server.writeToLog(String.format("Re-replicating %s on %s", file.getName(), Server.group.get(i)));
-                    Socket socket = new Socket(Server.group.get(i), FileHandler.REREPLICA_PORT);
+                    Socket socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
+                    Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
                     DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                     out.writeUTF(file.getName());
+                    Server.writeToLog(String.format("Sent file name to %s", Server.group.get(i)));
                     FileHandler.sendFile(file, socket, -1); // Send entire file
                     Server.writeToLog("Sent re-replication file");
                 }
@@ -192,7 +194,7 @@ public class Server {
                 String msg = SocketHelper.getStringFromPacket(packet);
                 updateMemberList(msg.split(Server.IP_DELIMITER));
                 new AckThread().start();
-                new ReReplicateReceiveThread().start();
+                new FailureReplicaThread().start();
                 new ConnectThread().start();
                 new PingThread().start();
             } catch (SocketTimeoutException e) {
@@ -370,12 +372,12 @@ class ServerResponseThread extends Thread {
 
 }
 
-class ReReplicateReceiveThread extends Thread {
+class FailureReplicaThread extends Thread {
     ServerSocket serverSocket;
 
-    public ReReplicateReceiveThread() {
+    public FailureReplicaThread() {
         try {
-            serverSocket = new ServerSocket(FileHandler.REREPLICA_PORT);
+            serverSocket = new ServerSocket(FileHandler.FAILURE_REPLICA_PORT);
         } catch (IOException e) {
             e.printStackTrace();
         }
