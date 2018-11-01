@@ -46,6 +46,16 @@ public class FileHandler {
         return String.format("%s/%s", getDirectoryPath(), filename);
     }
 
+    static void appendFileToFile(File src, File dst) throws IOException {
+        FileInputStream in =  new FileInputStream(src);
+        FileOutputStream out = new FileOutputStream(dst, true);
+        byte[] buffer = new byte[BUFFER_SIZE];
+        int count;
+        while ((count = in.read(buffer)) > 0) {
+            out.write(buffer, 0, count);
+        }
+    }
+
     static void deleteFile(String filename) {
         new File(getFilePath(filename)).delete();
     }

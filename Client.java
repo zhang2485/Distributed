@@ -136,12 +136,12 @@ class queryThread extends Thread implements Runnable {
                     } catch (IOException e) {
                         System.out.printf("File does not exist on local sdfs\n");
                         FileHandler.deleteFile(components[1]);
-                        socket.close();
+                        socket.close(); // Signal server to close the connection
                     }
                     break;
                 case "get":
                     try {
-                        FileHandler.receiveFile(components[2], socket, true);
+                        FileHandler.receiveFile(components[2], socket, false);
                         sb.append("Received file!\n");
                         synchronized (System.out) {
                             System.out.println(sb.toString());

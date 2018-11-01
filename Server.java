@@ -8,9 +8,13 @@ import java.nio.file.Files;
 
 public class Server {
     static final String IP_DELIMITER = " ";
+    private static final String INTRODUCER_IP = "172.22.156.255";
+
+    /* FOR DEBUGGING */
 //    private static final String INTRODUCER_IP = "192.168.1.12";
 //    private static final String INTRODUCER_IP = "10.195.57.170";
-    private static final String INTRODUCER_IP = "172.22.156.255";
+//    private static final String INTRODUCER_IP = "172.31.98.6";
+
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ss.SSS");
     public static final int SERVER_PORT = 2017;
     volatile static String ip;
@@ -282,8 +286,8 @@ class ServerResponseThread extends Thread {
                 case "put":
                     Server.writeToLog(String.format("Received put command: '%s'", cmd));
                     try {
-                        File tmpFile = File.createTempFile("", "");
-                        FileHandler.receiveFile(tmpFile, socket, false);
+                        File tmpFile = File.createTempFile(cmds[2], "");
+                        FileHandler.receiveFile(tmpFile, socket, true);
                         Server.writeToLog(String.format("Saved file to temp location: %s", tmpFile.getAbsolutePath()));
 
                         // Master node needs to coordinate where files go
@@ -356,7 +360,7 @@ class ReplicaReceiveThread extends Thread {
         try {
             if (FileHandler.receiveReplicaSignal()) {
                 // Signaled to save
-                file.renameTo(new File(FileHandler.getFilePath(filename)));
+                FileHandler.appendFileToFile(file, new File(FileHandler.getFilePath(filename)));
                 writer.writeBytes("File saved ACK");
                 Server.writeToLog("Received replica signal to save");
             } else {
