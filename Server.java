@@ -113,7 +113,7 @@ public class Server {
                     Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
                     DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                     out.writeUTF(file.getName());
-                    Server.writeToLog(String.format("Sent file name to %s", Server.group.get(i)));
+                    Server.writeToLog(String.format("Sent %s to %s", file.getName(), Server.group.get(i)));
                     FileHandler.sendFile(file, socket, -1); // Send entire file
                     Server.writeToLog("Sent re-replication file");
                 }
@@ -169,9 +169,9 @@ public class Server {
         if (ip.equals(INTRODUCER_IP)) {
             // If I am the introducer machine
             addToMemberList(ip);
+            new FailureReplicaThread().start();
             new AckThread().start();
             new IntroducerThread().start();
-            new FailureReplicaThread().start();
             new ConnectThread().start();
             new PingThread().start();
         } else {
@@ -194,8 +194,8 @@ public class Server {
                 socket.close(); // Allow connect thread to open port at CONNECT_PORT
                 String msg = SocketHelper.getStringFromPacket(packet);
                 updateMemberList(msg.split(Server.IP_DELIMITER));
-                new AckThread().start();
                 new FailureReplicaThread().start();
+                new AckThread().start();
                 new ConnectThread().start();
                 new PingThread().start();
             } catch (SocketTimeoutException e) {
