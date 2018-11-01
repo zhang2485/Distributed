@@ -286,6 +286,7 @@ class ServerResponseThread extends Thread {
                     Server.writeToLog(String.format("Received put command: '%s'", cmd));
                     try {
                         File tmpFile = File.createTempFile(cmds[2], "");
+                        tmpFile.deleteOnExit();
                         FileHandler.receiveFile(tmpFile, socket, true);
                         Server.writeToLog(String.format("Saved file to temp location: %s", tmpFile.getAbsolutePath()));
 
@@ -305,7 +306,10 @@ class ServerResponseThread extends Thread {
                         }
 
                         try {
-                            if (master != null) master.join();
+                            if (master != null) {
+                                master.join();
+                                Server.writeToLog("Master thread successfully joined");
+                            }
                             receive.join();
                             Server.writeToLog("Replica threads finished");
                         } catch (InterruptedException e) {
