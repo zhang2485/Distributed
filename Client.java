@@ -65,7 +65,7 @@ public class Client {
             System.exit(0);
         }
         System.out.printf("================= %s =================\n", cmd);
-
+        long startTime = System.currentTimeMillis();
         if (!commands.contains(cmds[0]) && checkCommand(cmd).equals("INVALID")) {
             System.out.printf("Type a valid command from %s%n", commands.toString());
             return;
@@ -83,7 +83,8 @@ public class Client {
             for (queryThread thread : threads)
                 thread.join();
         }
-        System.out.printf("================= %s =================\n", cmd);
+        long endTime = System.currentTimeMillis();
+        System.out.printf("================= %s %dms =================\n", cmd, endTime - startTime);
         lastInput = new String(cmd);
     }
 
