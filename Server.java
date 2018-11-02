@@ -465,6 +465,7 @@ class FailureReplicaCleanupThread extends Thread {
 
 class FailureReplicaReceiveThread extends Thread {
     ServerSocket serverSocket;
+    final int TIMEOUT = 2000;
 
     public FailureReplicaReceiveThread() {
         try {
@@ -480,12 +481,14 @@ class FailureReplicaReceiveThread extends Thread {
         while (true) {
             try {
                 Socket socket = serverSocket.accept();
+                socket.setSoTimeout(TIMEOUT);
                 Server.writeToLog("Got connection for re-replication");
                 DataInputStream in = new DataInputStream(socket.getInputStream());
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                 String filename = in.readUTF().trim();
                 Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
                 if (!FileHandler.fileExists(filename)) {
+                    Server.writeToLog("File does not exist for me, accepting re-replication file");
                     out.writeBoolean(true);
                     FileHandler.receiveFile(filename, socket);
                     Server.writeToLog(String.format("Saved re-replication file: %s", filename));
