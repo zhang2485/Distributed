@@ -335,7 +335,7 @@ class ServerResponseThread extends Thread {
                     } catch (IOException e) {
                         // If we could not find the file on our sdfs, then simply close socket to signal DNE
                         socket.close();
-                        Server.writeToLog(String.format("File did not exist: %s", cmds[1]));
+                        Server.writeToLog(String.format("IOException: %s", e.getMessage()));
                     }
                     break;
                 /*
