@@ -296,40 +296,30 @@ class ServerResponseThread extends Thread {
                 if the master node sends a signal to save, otherwise we delete the tmp file and move on.
                  */
                 case "put":
+                    // Receive signal to save or not
+                    ReplicaReceiveThread receive = new ReplicaReceiveThread(socket, writer, cmds[2]);
+                    receive.start();
+                    Server.writeToLog("Started replica receive thread");
+
+                    // Master node needs to coordinate where files go by sending the save/delete signals
+                    Server.writeToLog(String.format("Master node is: %s and my ip is %s", FileHandler.getMasterNodeIP(), Server.ip));
+                    ReplicaMasterThread master = null;
+                    if (Server.ip.equals(FileHandler.getMasterNodeIP())) {
+                        Server.writeToLog("I am the master node!");
+                        master = new ReplicaMasterThread(cmds[2]);
+                        master.start();
+                        Server.writeToLog("Started replica master thread");
+                    }
+
                     try {
-                        File tmpFile = File.createTempFile(cmds[2], "");
-                        tmpFile.deleteOnExit();
-                        FileHandler.receiveFile(tmpFile, socket);
-                        Server.writeToLog(String.format("Saved file to temp location: %s", tmpFile.getAbsolutePath()));
-
-                        // Receive signal to save or delete
-                        ReplicaReceiveThread receive = new ReplicaReceiveThread(tmpFile, writer, cmds[2]);
-                        receive.start();
-                        Server.writeToLog("Started replica receive thread");
-
-                        // Master node needs to coordinate where files go by sending the save/delete signals
-                        Server.writeToLog(String.format("Master node is: %s and my ip is %s", FileHandler.getMasterNodeIP(), Server.ip));
-                        ReplicaMasterThread master = null;
-                        if (Server.ip.equals(FileHandler.getMasterNodeIP())) {
-                            Server.writeToLog("I am the master node!");
-                            master = new ReplicaMasterThread(cmds[2]);
-                            master.start();
-                            Server.writeToLog("Started replica master thread");
+                        if (master != null) {
+                            master.join();
+                            Server.writeToLog("Master thread successfully joined");
                         }
-
-                        try {
-                            if (master != null) {
-                                master.join();
-                                Server.writeToLog("Master thread successfully joined");
-                            }
-                            receive.join();
-                            Server.writeToLog("Replica threads finished");
-                        } catch (InterruptedException e) {
-                            Server.writeToLog(e);
-                        }
-
-                    } catch (IOException e) {
-                        Server.writeToLog("File did not exist on the local host so they closed socket");
+                        receive.join();
+                        Server.writeToLog("Replica threads finished");
+                    } catch (InterruptedException e) {
+                        Server.writeToLog(e);
                     }
                     break;
                 /*
@@ -343,7 +333,6 @@ class ServerResponseThread extends Thread {
                         Server.writeToLog(String.format("Sent file: %s", cmds[1]));
                     } catch (FileNotFoundException e) {
                         // If we could not find the file on our sdfs, then simply close socket to signal DNE
-                        socket.close();
                         Server.writeToLog(String.format("IOException: %s", e.getMessage()));
                     }
                     break;
@@ -375,10 +364,9 @@ class ServerResponseThread extends Thread {
                             FileHandler.sendFile(tmpFile, socket);
                         } else {
                             Server.writeToLog("get-versions: Client requested too many versions");
-                            socket.close();
                         }
                     } catch (FileNotFoundException e) {
-                        socket.close();
+                        Server.writeToLog(e);
                     }
                     break;
                 /*
@@ -509,12 +497,12 @@ class FailureReplicaReceiveThread extends Thread {
 }
 
 class ReplicaReceiveThread extends Thread {
-    File file;
+    Socket socket;
     String filename;
     DataOutputStream writer;
 
-    public ReplicaReceiveThread(File file, DataOutputStream writer, String filename) {
-        this.file = file;
+    public ReplicaReceiveThread(Socket socket, DataOutputStream writer, String filename) {
+        this.socket = socket;
         this.writer = writer;
         this.filename = filename;
     }
@@ -525,15 +513,12 @@ class ReplicaReceiveThread extends Thread {
             if (FileHandler.receiveReplicaSignal()) {
                 // Signaled to save
                 Server.writeToLog("Received replica signal to save");
-                String newFilePath = FileHandler.getNewFilePath(filename);
-                Server.writeToLog("Saving file to " + newFilePath);
-                Files.move(Paths.get(file.getAbsolutePath()), Paths.get(newFilePath));
+                FileHandler.receiveFile(filename, socket);
+                Server.writeToLog(String.format("Saved file: %s", filename));
                 writer.writeBytes("File saved ACK");
             } else {
-                // Signaled to delete
-                file.delete();
-                writer.writeBytes("File deleted ACK");
-                Server.writeToLog("Received replica signal to delete");
+                writer.writeBytes("File not saved ACK");
+                Server.writeToLog("Received replica signal to not save");
             }
         } catch (IOException e) {
             Server.writeToLog(e);

@@ -141,7 +141,6 @@ class queryThread extends Thread implements Runnable {
                         FileHandler.sendFile(components[1], socket, 0);
                     } catch (IOException e) {
                         e.printStackTrace();
-                        socket.close(); // Signal server to close the connection
                     }
                     break;
                 case "get":
@@ -186,6 +185,7 @@ class queryThread extends Thread implements Runnable {
                 System.out.println(sb.toString());
             }
 
+            socket.close();
         } catch (IOException e) {
             System.out.printf("Could not query to %s due to %s\n", ip, e.getMessage());
         }
