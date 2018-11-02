@@ -35,7 +35,7 @@ public class FileHandler {
         if (lower < upper) {
             return idx >= lower && idx < upper;
         }
-        return idx < upper || idx > lower;
+        return idx < upper || idx >= lower;
     }
 
     static boolean fileExists(String filename) {
