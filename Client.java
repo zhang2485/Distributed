@@ -116,6 +116,7 @@ class queryThread extends Thread implements Runnable {
     private BufferedReader reader;
     private DataOutputStream writer;
     private String cmd;
+    static private final Object lock = new Object();
     static boolean read_quorum;
 
     public queryThread(String ip, int port, String cmd) throws IOException {
@@ -152,7 +153,7 @@ class queryThread extends Thread implements Runnable {
                         if (in.readBoolean()) {
                             sb.append("Received ACK for file!\n");
                             if (!read_quorum) {
-                                synchronized(read_quorum) {
+                                synchronized(lock) {
                                     read_quorum = true;
                                 }
                                 FileHandler.receiveFile(components[2], socket);
