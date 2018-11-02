@@ -148,6 +148,7 @@ public class Server {
         writeToLog(String.format("Attempting to start server at: %s", ip));
 
         new FailureReplicaReceiveThread().start();
+        new FailureReplicaCleanupThread().start();
         if (ip.equals(INTRODUCER_IP)) {
             // If I am the introducer machine
             addToMemberList(ip);
@@ -390,6 +391,22 @@ class FailureReplicaSendThread extends Thread {
                             }
                         }
                     }
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class FailureReplicaCleanupThread extends Thread {
+    @Override
+    public void run() {
+        while(true) try {
+            for (File file : FileHandler.getFiles()) {
+                if (!FileHandler.isReplicaNode(file.getName(), Server.group.indexOf(Server.ip))) {
+                    Server.writeToLog(String.format("Deleting %s since it was duplicate", file.getName()));
+                    file.delete();
                 }
             }
         } catch (IOException e) {
