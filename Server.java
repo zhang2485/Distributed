@@ -411,23 +411,25 @@ class FailureReplicaCleanupThread extends Thread {
 
     @Override
     public void run() {
-        while(true) try {
-            int myIndex = Server.group.indexOf(Server.ip);
-            if (myIndex != -1) {
-                for (File file : FileHandler.getFiles()) {
-                    if (!FileHandler.isReplicaNode(file.getName(), myIndex)) {
-                        Server.writeToLog(String.format("Deleting %s since it was duplicate", file.getName()));
-                        file.delete();
-                    } else {
-                        new FailureReplicaSendThread().run();
+        while(true) {
+            try {
+                int myIndex = Server.group.indexOf(Server.ip);
+                if (myIndex != -1) {
+                    for (File file : FileHandler.getFiles()) {
+                        if (!FileHandler.isReplicaNode(file.getName(), myIndex)) {
+                            Server.writeToLog(String.format("Deleting %s since it was duplicate", file.getName()));
+                            file.delete();
+                        } else {
+                            new FailureReplicaSendThread().run();
+                        }
                     }
+                } else {
+                    Server.writeToLog("My index is -1");
                 }
-            } else {
-                Server.writeToLog("My index is -1");
+                Thread.sleep(500);
+            } catch (IOException | InterruptedException e) {
+                e.printStackTrace();
             }
-            Thread.sleep(500);
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
         }
     }
 }
