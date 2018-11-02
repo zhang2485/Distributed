@@ -161,8 +161,6 @@ class queryThread extends Thread implements Runnable {
                                 socket.close();
                             }
                         }
-                    } else {
-                        sb.append("File did not exist");
                     }
                     synchronized (System.out) {
                         System.out.println(sb.toString());
@@ -181,8 +179,6 @@ class queryThread extends Thread implements Runnable {
                                 socket.close();
                             }
                         }
-                    } else {
-                        sb.append("File did not exist");
                     }
                     synchronized (System.out) {
                         System.out.println(sb.toString());

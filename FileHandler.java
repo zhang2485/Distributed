@@ -54,10 +54,7 @@ public class FileHandler {
     }
 
     static boolean fileExists(String filename) {
-        for (File f : getFiles()) {
-            if (f.getName().equals(filename)) return true;
-        }
-        return false;
+        return new File(getFilePath(filename)).exists();
     }
 
     static String getDirectoryPath() {
