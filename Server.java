@@ -353,7 +353,7 @@ class ServerResponseThread extends Thread {
                         Server.writeToLog("get-versions: Concatenating versions to a temp file");
                         for (int i = numVersions - numVersionsRequested; i < numVersions; i++) {
                             int version = i + 1; // i + 1 because versions are 1-indexed
-                            String filePath = FileHandler.getFilePath(cmds[2]);
+                            String filePath = FileHandler.getFilePath(cmds[1]);
                             File versionFile = FileHandler.getVersionContent(new File(filePath), version, false);
                             FileHandler.appendFileToFile(tmpFile, versionFile);
                             Server.writeToLog(String.format("get-versions appended version: %d", version));
