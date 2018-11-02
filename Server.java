@@ -328,9 +328,12 @@ class ServerResponseThread extends Thread {
                  */
                 case "get":
                     try {
-                        int versions = FileHandler.numVersions(cmds[1]);
-                        FileHandler.sendFile(cmds[1], socket, versions - 1);
-                        Server.writeToLog(String.format("Sent file: %s", cmds[1]));
+                        if (FileHandler.fileExists(cmds[1])) {
+                            writer.writeBoolean(true);
+                            int versions = FileHandler.numVersions(cmds[1]);
+                            FileHandler.sendFile(cmds[1], socket, versions - 1);
+                            Server.writeToLog(String.format("Sent file: %s", cmds[1]));
+                        }
                     } catch (FileNotFoundException e) {
                         // If we could not find the file on our sdfs, then simply close socket to signal DNE
                         Server.writeToLog(String.format("IOException: %s", e.getMessage()));
@@ -518,7 +521,6 @@ class ReplicaReceiveThread extends Thread {
                 Server.writeToLog(String.format("Saved file: %s", filename));
                 writer.writeBytes("File saved ACK");
             } else {
-                writer.writeBytes("File not saved ACK");
                 Server.writeToLog("Received replica signal to not save");
             }
         } catch (IOException e) {

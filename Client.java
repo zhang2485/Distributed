@@ -74,6 +74,7 @@ public class Client {
             FileHandler.printFiles();
         } else {
             ArrayList<queryThread> threads = new ArrayList<>();
+            queryThread.read_quorum = false;
             for (String server : serverList) {
                 queryThread thread = new queryThread(server, Server.SERVER_PORT, cmd);
                 thread.start();
@@ -114,6 +115,7 @@ class queryThread extends Thread implements Runnable {
     private BufferedReader reader;
     private DataOutputStream writer;
     private String cmd;
+    static boolean read_quorum;
 
     public queryThread(String ip, int port, String cmd) throws IOException {
         this.cmd = String.format("%s\n", cmd);
@@ -145,8 +147,17 @@ class queryThread extends Thread implements Runnable {
                     break;
                 case "get":
                     try {
-                        FileHandler.receiveFile(components[2], socket);
-                        sb.append("Received file!\n");
+                        DataInputStream in = new DataInputStream(socket.getInputStream());
+                        if (in.readBoolean()) {
+                            sb.append("Received ACK for file!\n");
+                            if (!read_quorum) {
+                                read_quorum = true;
+                                FileHandler.receiveFile(components[2], socket);
+                                sb.append("Received file!\n");
+                            } else {
+                                sb.append("File already ACKED on another query thread");
+                            }
+                        }
                         synchronized (System.out) {
                             System.out.println(sb.toString());
                         }
