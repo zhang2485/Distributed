@@ -394,6 +394,7 @@ class ServerResponseThread extends Thread {
 }
 
 class FailureReplicaSendThread extends FailureDetectionThread {
+    final int TIMEOUT = 2000;
     @Override
     public void run() {
         while (true) {
@@ -404,8 +405,8 @@ class FailureReplicaSendThread extends FailureDetectionThread {
                     for (int i = 0; i < Server.group.size(); i++) {
                         if (FileHandler.isReplicaNode(file.getName(), i)) {
                             Server.writeToLog(String.format("Re-replicating %s to %s", file.getName(), Server.group.get(i)));
-                            Socket socket;
-                            socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
+                            Socket socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
+                            socket.setSoTimeout(TIMEOUT);
                             Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
                             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                             DataInputStream in = new DataInputStream(socket.getInputStream());
