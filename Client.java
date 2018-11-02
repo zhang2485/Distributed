@@ -160,6 +160,7 @@ class queryThread extends Thread implements Runnable {
                                 sb.append("Received file!\n");
                             } else {
                                 sb.append("File already ACKED on another query thread\n");
+                                socket.close();
                             }
                         }
                         synchronized (System.out) {
