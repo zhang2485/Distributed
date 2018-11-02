@@ -362,10 +362,10 @@ class ServerResponseThread extends Thread {
                             int version = i + 1; // i + 1 because versions are 1-indexed
                             String filePath = FileHandler.getFilePath(cmds[1]);
                             File versionFile = FileHandler.getVersionContent(new File(filePath), version, false);
-                            FileHandler.appendFileToFile(tmpFile, versionFile);
+                            FileHandler.appendFileToFile(versionFile, tmpFile);
                             Server.writeToLog(String.format("get-versions appended version: %d", version));
                         }
-                        Server.writeToLog(String.format("get-versions Sending concatenated versions from: %s", tmpFile.getAbsolutePath()));
+                        Server.writeToLog(String.format("get-versions Sending concatenated versions: %s", tmpFile.getAbsolutePath()));
                         FileHandler.sendFile(tmpFile, socket, -1);
                     } else {
                         Server.writeToLog("get-versions: Client requested too many versions");
@@ -387,6 +387,7 @@ class ServerResponseThread extends Thread {
             socket.close();
         } catch (IOException e) {
             Server.writeToLog(Server.getStackTrace(e));
+            socket.close();
         }
 
     }

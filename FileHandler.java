@@ -177,7 +177,7 @@ public class FileHandler {
 
         long numBytes = fileVersion.length();
         // Handle empty files by throwing an exception
-        if (numBytes <= 0) throw new IOException();
+        if (numBytes <= 0) throw new IOException("Tried to send empty file");
         out.writeLong(numBytes);
 
         // Send the file
