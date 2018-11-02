@@ -152,7 +152,9 @@ class queryThread extends Thread implements Runnable {
                         if (in.readBoolean()) {
                             sb.append("Received ACK for file!\n");
                             if (!read_quorum) {
-                                read_quorum = true;
+                                synchronized(read_quorum) {
+                                    read_quorum = true;
+                                }
                                 FileHandler.receiveFile(components[2], socket);
                                 sb.append("Received file!\n");
                             } else {
