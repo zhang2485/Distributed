@@ -20,16 +20,17 @@ public class Client {
 //            "localhost",
 //    };
     private static HashSet<String> commands = new HashSet<>(Arrays.asList(
-            "grep",
-            "exit",
-            "print",
-            "quit",
-            "log",
-            "put localfilename sdfsfilename",
-            "get sdfsfilename localfilename",
-            "ls sdsfilename",
-            "store",
-            "delete sdsfilename"
+        "grep",
+        "exit",
+        "print",
+        "quit",
+        "log",
+        "put localfilename sdfsfilename",
+        "get sdfsfilename localfilename",
+        "ls sdsfilename",
+        "store",
+        "delete sdsfilename",
+        "get-versions sdfsfilename num-versions localfilename"
     ));
     private static String lastInput;
 
