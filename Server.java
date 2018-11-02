@@ -390,7 +390,7 @@ class FailureReplicaSendThread extends Thread {
                                 scanning = false;
                             } catch (ConnectException e) {
                                 try {
-                                    Thread.sleep(2000); // 2 seconds
+                                    Thread.sleep(2000);
                                 } catch (InterruptedException ie) {
                                     ie.printStackTrace();
                                 }
@@ -421,13 +421,16 @@ class FailureReplicaCleanupThread extends Thread {
                     for (File file : FileHandler.getFiles()) {
                         if (!FileHandler.isReplicaNode(file.getName(), myIndex)) {
                             Server.writeToLog(String.format("Deleting %s since it was duplicate", file.getName()));
+                            Server.writeToLog(String.format("Deleting %s", Server.group.toString()));
+                            Server.writeToLog(String.format("Deleting %d", myIndex));
+                            Server.writeToLog(String.format("Deleting %s", Server.ip));
                             file.delete();
                         }
                     }
                 }
                 Thread.sleep(500);
             } catch (InterruptedException e) {
-                Server.writeToLog(String.format("My: %s", e.getMessage()));
+                Server.writeToLog(e.getMessage());
             }
         }
     }
