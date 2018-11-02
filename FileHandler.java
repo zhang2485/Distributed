@@ -10,7 +10,7 @@ public class FileHandler {
     static final int BUFFER_SIZE  = 1000000;
     static final int REPLICA_PORT = 2018;
     static final int FAILURE_REPLICA_PORT = 5000;
-    static final String DELIMITER = "--NEW FILE--\n";
+    static final String DELIMITER = "\n--NEW FILE--\n";
 
     static File[] getFiles() {
         File directory = new File(getDirectoryPath());
@@ -123,12 +123,15 @@ public class FileHandler {
         FileWriter out = new FileWriter(tmpFile);
         if (scanner.hasNext()) {
             out.write(scanner.next());
+            out.flush();
         } else {
-            while (scanner.hasNextLine()) {
-                out.write(scanner.nextLine());
-            }
+            byte[] buffer = new byte[BUFFER_SIZE];
+            FileInputStream in = new FileInputStream(file);
+            FileOutputStream fos = new FileOutputStream(tmpFile);
+            int count;
+            while ((count = in.read(buffer)) > 0)
+                fos.write(buffer, 0, count);
         }
-        out.flush();
         return tmpFile;
     }
 
