@@ -402,6 +402,7 @@ class FailureReplicaSendThread extends Thread {
 class FailureReplicaCleanupThread extends Thread {
     @Override
     public void run() {
+        Server.writeToLog("Instantiated FailureReplicaCleanupThread");
         while(true) try {
             for (File file : FileHandler.getFiles()) {
                 if (!FileHandler.isReplicaNode(file.getName(), Server.group.indexOf(Server.ip))) {
