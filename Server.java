@@ -349,33 +349,32 @@ class ServerResponseThread extends Thread {
                 get all versions of a file
                 */
                 case "get-versions":
-                    int numVersions;
                     try {
-                        numVersions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
+                        int numVersions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
+                        Server.writeToLog(String.format("get-versions numVersions: %d", numVersions));
+                        int numVersionsRequested = Integer.parseInt(cmds[2]);
+                        Server.writeToLog(String.format("get-versions numVersionsRequested: %d", numVersionsRequested));
+                        // Concatenate all versions into a tmp file
+                        File tmpFile = File.createTempFile(cmds[1], "");
+                        tmpFile.deleteOnExit();
+                        Server.writeToLog(String.format("get-versions tmpFile: %s", tmpFile.getAbsolutePath()));
+                        if (numVersions - numVersionsRequested > -1) {
+                            Server.writeToLog("get-versions: Concatenating versions to a temp file");
+                            for (int i = numVersions - numVersionsRequested; i < numVersions; i++) {
+                                int version = i + 1; // i + 1 because versions are 1-indexed
+                                String filePath = FileHandler.getFilePath(cmds[1]);
+                                File versionFile = FileHandler.getVersionContent(new File(filePath), version, false);
+                                FileHandler.appendFileToFile(versionFile, tmpFile);
+                                Server.writeToLog(String.format("get-versions appended version: %d", version));
+                            }
+                            Server.writeToLog(String.format("get-versions Sending concatenated versions: %s", tmpFile.getAbsolutePath()));
+                            FileHandler.sendFile(tmpFile, socket, -1);
+                        } else {
+                            Server.writeToLog("get-versions: Client requested too many versions");
+                            socket.close();
+                        }
                     } catch (FileNotFoundException e) {
                         writer.writeBytes("-----not found");
-                        socket.close();
-                    }
-                    Server.writeToLog(String.format("get-versions numVersions: %d", numVersions));
-                    int numVersionsRequested = Integer.parseInt(cmds[2]);
-                    Server.writeToLog(String.format("get-versions numVersionsRequested: %d", numVersionsRequested));
-                    // Concatenate all versions into a tmp file
-                    File tmpFile = File.createTempFile(cmds[1], "");
-                    tmpFile.deleteOnExit();
-                    Server.writeToLog(String.format("get-versions tmpFile: %s", tmpFile.getAbsolutePath()));
-                    if (numVersions - numVersionsRequested > -1) {
-                        Server.writeToLog("get-versions: Concatenating versions to a temp file");
-                        for (int i = numVersions - numVersionsRequested; i < numVersions; i++) {
-                            int version = i + 1; // i + 1 because versions are 1-indexed
-                            String filePath = FileHandler.getFilePath(cmds[1]);
-                            File versionFile = FileHandler.getVersionContent(new File(filePath), version, false);
-                            FileHandler.appendFileToFile(versionFile, tmpFile);
-                            Server.writeToLog(String.format("get-versions appended version: %d", version));
-                        }
-                        Server.writeToLog(String.format("get-versions Sending concatenated versions: %s", tmpFile.getAbsolutePath()));
-                        FileHandler.sendFile(tmpFile, socket, -1);
-                    } else {
-                        Server.writeToLog("get-versions: Client requested too many versions");
                         socket.close();
                     }
                     break;
