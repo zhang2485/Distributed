@@ -155,7 +155,7 @@ class queryThread extends Thread implements Runnable {
                                 FileHandler.receiveFile(components[2], socket);
                                 sb.append("Received file!\n");
                             } else {
-                                sb.append("File already ACKED on another query thread");
+                                sb.append("File already ACKED on another query thread\n");
                             }
                         }
                         synchronized (System.out) {
