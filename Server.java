@@ -63,6 +63,13 @@ public class Server {
         return arr;
     }
 
+    public static String getStackTrace(final Throwable throwable) {
+        final StringWriter sw = new StringWriter();
+        final PrintWriter pw = new PrintWriter(sw, true);
+        throwable.printStackTrace(pw);
+        return sw.getBuffer().toString();
+    }
+
     static String readFile(String path, Charset encoding) throws IOException {
         byte[] encoded = Files.readAllBytes(Paths.get(path));
         return new String(encoded, encoding);
@@ -379,7 +386,7 @@ class ServerResponseThread extends Thread {
             }
             socket.close();
         } catch (IOException e) {
-            Server.writeToLog(e.getMessage());
+            Server.writeToLog(Server.getStackTrace(e));
         }
 
     }
