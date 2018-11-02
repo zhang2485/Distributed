@@ -124,11 +124,11 @@ class queryThread extends Thread implements Runnable {
 
     @Override
     public void run() {
+        StringBuilder sb = new StringBuilder();
         try {
             socket = new Socket(ip, port);
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             writer = new DataOutputStream(socket.getOutputStream());
-            StringBuilder sb = new StringBuilder();
             sb.append(String.format("%s\n", ip));
 
             // Send command to server
@@ -192,5 +192,6 @@ class queryThread extends Thread implements Runnable {
                 System.out.println(sb.toString());
             }
         }
+
     }
 }

@@ -410,7 +410,8 @@ class FailureReplicaSendThread extends FailureDetectionThread {
                             boolean sendOrNot = in.readBoolean();
                             if (sendOrNot) {
                                 Server.writeToLog(String.format("Sending %s to %s", file.getName(), Server.group.get(i)));
-                                FileHandler.sendAllVersions(file, socket); // Send entire file
+                                int versions = FileHandler.numVersions(file.getName());
+                                FileHandler.sendFile(file, socket, versions - 1); // Send entire file
                                 Server.writeToLog("Sent re-replication file");
                             } else {
                                 Server.writeToLog("Did not send re-replication file");
@@ -482,7 +483,7 @@ class FailureReplicaReceiveThread extends Thread {
                 Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
                 if (!FileHandler.fileExists(filename)) {
                     out.writeBoolean(true);
-                    FileHandler.receiveVersions(filename, socket);
+                    FileHandler.receiveFile(filename, socket);
                     Server.writeToLog(String.format("Saved re-replication file: %s", filename));
                 } else {
                     out.writeBoolean(false);

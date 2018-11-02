@@ -184,44 +184,6 @@ public class FileHandler {
         }
     }
 
-    static void sendAllVersions(String filename, Socket socket) throws IOException {
-        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        out.writeInt(numVersions(filename));
-        for (File file : listVersions(filename)) {
-            FileInputStream in = new FileInputStream(file);
-
-            long numBytes = file.length();
-            // Handle empty files by throwing an exception
-            if (numBytes <= 0) {
-                file.delete();
-                throw new IOException("Tried to send empty file");
-            }
-            out.writeLong(numBytes);
-
-            // Send the file
-            int count;
-            byte[] buffer = new byte[BUFFER_SIZE];
-            while ((count = in.read(buffer)) > 0) {
-                out.write(buffer, 0, count);
-            }
-        }
-    }
-
-    static void sendAllVersions(File file, Socket socket) throws IOException {
-        sendAllVersions(file.getName(), socket);
-    }
-
-    static void receiveVersions(String filename, Socket socket) throws IOException {
-        DataInputStream in = new DataInputStream(socket.getInputStream());
-        int numVersions = in.readInt();
-        if (!FileHandler.fileExists(filename))
-            new File(getFilePath(filename)).mkdirs();
-        for (int i = 0; i < numVersions; i++) {
-            receiveFile(new File(getNewFilePath(filename)), socket);
-        }
-    }
-
-
     static void receiveFile(File file, Socket socket) throws IOException {
         if (file.isDirectory())
             file = new File(getNewFilePath(file.getName()));
