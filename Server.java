@@ -420,10 +420,11 @@ class FailureReplicaCleanupThread extends Thread {
                 if (myIndex != -1) {
                     for (File file : FileHandler.getFiles()) {
                         if (!FileHandler.isReplicaNode(file.getName(), myIndex)) {
-                            Server.writeToLog(String.format("Deleting %s since it was duplicate", file.getName()));
-                            Server.writeToLog(String.format("Deleting %s", Server.group.toString()));
-                            Server.writeToLog(String.format("Deleting %d", myIndex));
-                            Server.writeToLog(String.format("Deleting %s", Server.ip));
+                            Server.writeToLog(String.format("Deleting-file: %s", file.getName()));
+                            Server.writeToLog(String.format("Deleting-group: %s", Server.group.toString()));
+                            Server.writeToLog(String.format("Deleting-file-nod: %d", FileHandler.getNodeFromFile(file.getName())));
+                            Server.writeToLog(String.format("Deleting-myIndex: %d", myIndex));
+                            Server.writeToLog(String.format("Deleting-Server.ip: %s", Server.ip));
                             file.delete();
                         }
                     }
