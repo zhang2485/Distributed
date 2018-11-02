@@ -399,7 +399,7 @@ class ServerResponseThread extends Thread {
 
 }
 
-class FailureReplicaSendThread extends Thread {
+class FailureReplicaSendThread extends FailureDetectionThread {
     @Override
     public void run() {
         while (true) {
@@ -409,7 +409,7 @@ class FailureReplicaSendThread extends Thread {
                     Server.writeToLog(String.format("Re-replicating: %s", file.getName()));
                     for (int i = 0; i < Server.group.size(); i++) {
                         if (FileHandler.isReplicaNode(file.getName(), i)) {
-                            Server.writeToLog(String.format("Re-replicating %s on %s", file.getName(), Server.group.get(i)));
+                            Server.writeToLog(String.format("Re-replicating %s to %s", file.getName(), Server.group.get(i)));
                             Socket socket;
                             socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
                             Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
@@ -421,7 +421,7 @@ class FailureReplicaSendThread extends Thread {
                         }
                     }
                 }
-                Thread.sleep(1500);
+                systemClockSleep(1500);
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             }
