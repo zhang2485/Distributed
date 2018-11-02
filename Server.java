@@ -337,8 +337,9 @@ class ServerResponseThread extends Thread {
                         int versions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
                         FileHandler.sendFile(cmds[1], socket, versions);
                         Server.writeToLog(String.format("Sent file: %s", cmds[1]));
-                    } catch (IOException e) {
+                    } catch (FileNotFoundException e) {
                         // If we could not find the file on our sdfs, then simply close socket to signal DNE
+                        writer.writeBytes("-----not found");
                         socket.close();
                         Server.writeToLog(String.format("IOException: %s", e.getMessage()));
                     }
@@ -348,7 +349,13 @@ class ServerResponseThread extends Thread {
                 get all versions of a file
                 */
                 case "get-versions":
-                    int numVersions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
+                    int numVersions;
+                    try {
+                        numVersions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
+                    } catch (FileNotFoundException e) {
+                        writer.writeBytes("-----not found");
+                        socket.close();
+                    }
                     Server.writeToLog(String.format("get-versions numVersions: %d", numVersions));
                     int numVersionsRequested = Integer.parseInt(cmds[2]);
                     Server.writeToLog(String.format("get-versions numVersionsRequested: %d", numVersionsRequested));
