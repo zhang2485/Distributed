@@ -43,8 +43,8 @@ public class Server {
             Process proc = rt.exec(cmd);
             // Convert the command result into a String List
             return saveStream(proc.getInputStream());
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        } catch (Exception e) {
+            Server.writeToLog(e);
         }
         return res;
     }
@@ -91,6 +91,10 @@ public class Server {
         return dateFormatter.format(new Date());
     }
 
+    static void writeToLog(final Throwable throwable) {
+        writeToLog(getStackTrace(throwable));
+    }
+
     static void writeToLog(String msg) {
         try {
             String date = getCurrentDateAsString();
@@ -99,7 +103,7 @@ public class Server {
             log.write(constructedLog);
             log.flush();
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 
@@ -321,7 +325,7 @@ class ServerResponseThread extends Thread {
                             receive.join();
                             Server.writeToLog("Replica threads finished");
                         } catch (InterruptedException e) {
-                            e.printStackTrace();
+                            Server.writeToLog(e);
                         }
 
                     } catch (IOException e) {
@@ -392,7 +396,7 @@ class ServerResponseThread extends Thread {
             }
             socket.close();
         } catch (IOException e) {
-            Server.writeToLog(Server.getStackTrace(e));
+            Server.writeToLog(e);
         }
 
     }
@@ -422,8 +426,8 @@ class FailureReplicaSendThread extends FailureDetectionThread {
                     }
                 }
                 systemClockSleep(1500);
-            } catch (IOException | InterruptedException e) {
-                e.printStackTrace();
+            } catch (IOException e) {
+                Server.writeToLog(e);
             }
         }
     }
@@ -469,7 +473,7 @@ class FailureReplicaReceiveThread extends Thread {
             serverSocket = new ServerSocket(FileHandler.FAILURE_REPLICA_PORT);
             Server.writeToLog("Instantiated failure replica receive server socket");
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 
@@ -491,7 +495,7 @@ class FailureReplicaReceiveThread extends Thread {
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                Server.writeToLog(e);
             }
         }
     }
@@ -524,7 +528,7 @@ class ReplicaReceiveThread extends Thread {
                 Server.writeToLog("Received replica signal to delete");
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 }
@@ -601,7 +605,7 @@ class AckThread extends FailureDetectionThread implements Runnable {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 }
@@ -645,7 +649,7 @@ class PingThread extends FailureDetectionThread implements Runnable {
                 systemClockSleep(PROTOCOL_PERIOD);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 }
@@ -666,7 +670,7 @@ class IntroducerThread extends FailureDetectionThread implements Runnable {
                 disseminate();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 }
@@ -682,7 +686,7 @@ class ConnectThread extends FailureDetectionThread implements Runnable {
                 Server.updateMemberList(newList.split(Server.IP_DELIMITER));
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 }
