@@ -182,11 +182,11 @@ public class FileHandler {
         while ((count = in.read(buffer)) > 0) {
             out.write(buffer, 0, count);
         }
+
     }
 
-    static void receiveFile(File file, Socket socket) throws IOException {
-        if (file.isDirectory())
-            file = new File(getNewFilePath(file.getName()));
+    static void receiveFile(String filename, Socket socket) throws IOException {
+        File file = new File(getNewFilePath(filename));
         FileOutputStream out = new FileOutputStream(file);
         DataInputStream in = new DataInputStream(socket.getInputStream());
 
@@ -200,10 +200,6 @@ public class FileHandler {
             if ((numBytes -= count) == 0)
                 break;
         }
-    }
-
-    static void receiveFile(String filename, Socket socket) throws IOException {
-        receiveFile(new File(getFilePath(filename)), socket);
     }
 
 }
