@@ -483,8 +483,8 @@ class FailureReplicaReceiveThread extends Thread {
 
     @Override
     public void run() {
-        try {
-            while (true) {
+        while (true) {
+            try {
                 Socket socket = serverSocket.accept();
                 Server.writeToLog("Got connection for re-replication");
                 DataInputStream in = new DataInputStream(socket.getInputStream());
@@ -496,9 +496,9 @@ class FailureReplicaReceiveThread extends Thread {
                 } else {
                     Server.writeToLog(String.format("Re-replication file already exists: %s", filename));
                 }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
