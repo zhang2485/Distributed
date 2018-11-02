@@ -482,7 +482,7 @@ class FailureReplicaReceiveThread extends Thread {
             try {
                 Socket socket = serverSocket.accept();
                 socket.setSoTimeout(TIMEOUT);
-                Server.writeToLog("Got connection for re-replication");
+                Server.writeToLog(String.format("Got connection for re-replication from %s", socket.getRemoteSocketAddress().toString()));
                 DataInputStream in = new DataInputStream(socket.getInputStream());
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                 String filename = in.readUTF().trim();
