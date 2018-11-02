@@ -6,6 +6,8 @@ import java.net.SocketException;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import static java.lang.Math.abs;
+
 public class FileHandler {
     static final String USER_DIR = "user.dir";
     static final String SDFS_DIR = "sdfs";
@@ -33,7 +35,7 @@ public class FileHandler {
     }
 
     static int getNodeFromFile(String filename) {
-        return (filename.hashCode() % 10) % Server.group.size();
+        return abs((filename.hashCode() % 10) % Server.group.size());
     }
 
     static void printFiles() {

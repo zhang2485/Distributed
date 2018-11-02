@@ -547,6 +547,7 @@ class ReplicaMasterThread extends Thread {
             for (int i = 0; i < Server.group.size(); i++) {
                 boolean signal = FileHandler.isReplicaNode(filename, i);
                 Server.writeToLog(String.format("Master-thread-filename: %s", filename));
+                Server.writeToLog(String.format("Master-thread-signal: %b", signal));
                 Server.writeToLog(String.format("Master-thread-hashcode: %s", filename.hashCode()));
                 Server.writeToLog(String.format("Master-thread-file-node: %d", FileHandler.getNodeFromFile(filename)));
                 Server.writeToLog(String.format("Master-thread-group: %s", Server.group.toString()));
