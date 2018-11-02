@@ -281,9 +281,9 @@ class ServerResponseThread extends Thread {
                  */
                 case "ls":
                     if (FileHandler.fileExists(cmds[1])) {
-                        writer.writeBytes("File found!");
+                        writer.writeBytes("+++++File found!");
                     } else {
-                        writer.writeBytes("File not found...");
+                        writer.writeBytes("-----not found");
                     }
                     Server.writeToLog(String.format("Checked for %s.", cmds[1]));
                     break;
@@ -422,7 +422,7 @@ class FailureReplicaCleanupThread extends Thread {
                         if (!FileHandler.isReplicaNode(file.getName(), myIndex)) {
                             Server.writeToLog(String.format("Deleting-file: %s", file.getName()));
                             Server.writeToLog(String.format("Deleting-group: %s", Server.group.toString()));
-                            Server.writeToLog(String.format("Deleting-file-nod: %d", FileHandler.getNodeFromFile(file.getName())));
+                            Server.writeToLog(String.format("Deleting-file-node: %d", FileHandler.getNodeFromFile(file.getName())));
                             Server.writeToLog(String.format("Deleting-myIndex: %d", myIndex));
                             Server.writeToLog(String.format("Deleting-Server.ip: %s", Server.ip));
                             file.delete();
