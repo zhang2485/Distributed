@@ -21,7 +21,7 @@ public class FileHandler {
     }
 
     static int getNodeFromFile(String filename) {
-        return filename.hashCode() % Server.group.size();
+        return (filename.hashCode() % 10) % Server.group.size();
     }
 
     static void printFiles() {
