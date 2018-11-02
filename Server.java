@@ -419,14 +419,8 @@ class FailureReplicaCleanupThread extends Thread {
                         if (!FileHandler.isReplicaNode(file.getName(), myIndex)) {
                             Server.writeToLog(String.format("Deleting %s since it was duplicate", file.getName()));
                             file.delete();
-                        } else {
-                            new FailureReplicaSendThread().run();
                         }
                     }
-                } else {
-                    Server.writeToLog(String.format("My group: %s", Server.group.toString()));
-                    Server.writeToLog(String.format("My ip: %s", Server.ip));
-                    Server.writeToLog("My index is -1");
                 }
                 Thread.sleep(500);
             } catch (InterruptedException e) {
