@@ -7,7 +7,7 @@ import java.util.Scanner;
 public class FileHandler {
     static final String USER_DIR = "user.dir";
     static final String SDFS_DIR = "sdfs";
-    static final int BUFFER_SIZE  = 2048;
+    static final int BUFFER_SIZE  = 1000000;
     static final int REPLICA_PORT = 2018;
     static final int FAILURE_REPLICA_PORT = 5000;
     static final String DELIMITER = "--NEW FILE--\n";
