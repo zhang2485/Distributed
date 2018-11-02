@@ -413,6 +413,8 @@ class FailureReplicaCleanupThread extends Thread {
     public void run() {
         while(true) try {
             for (File file : FileHandler.getFiles()) {
+                Server.writeToLog(String.format("My index: %d", Server.group.indexOf(Server.ip)));
+                Server.writeToLog(String.format("File lower idx: %d", FileHandler.getNodeFromFile(file.getName())));
                 if (!FileHandler.isReplicaNode(file.getName(), Server.group.indexOf(Server.ip))) {
                     Server.writeToLog(String.format("Deleting %s since it was duplicate", file.getName()));
                     file.delete();
