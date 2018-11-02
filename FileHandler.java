@@ -2,7 +2,8 @@ import java.io.*;
 import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Scanner;
+import java.util.Arrays;
+import java.util.Comparator;
 
 public class FileHandler {
     static final String USER_DIR = "user.dir";
@@ -16,6 +17,15 @@ public class FileHandler {
         File directory = new File(getDirectoryPath());
         return directory.listFiles();
     }
+
+    static File[] listVersions(String filename) {
+        File file = new File(getFilePath(filename));
+        if (file.isDirectory()) {
+            return file.listFiles();
+        }
+        return new File[]{file};
+    }
+
 
     static String getMasterNodeIP() {
         return Server.group.get(0);
@@ -55,6 +65,16 @@ public class FileHandler {
         return String.format("%s/%s", getDirectoryPath(), filename);
     }
 
+    static String getNewFilePath(String filename) {
+        if (!fileExists(filename))
+            new File(getFilePath(filename)).mkdirs();
+        return String.format("%s/%s", getFilePath(filename), fileNameSafeString(Server.getCurrentDateAsString()));
+    }
+
+    static String fileNameSafeString(String filename) {
+        return filename.replaceAll("[^a-zA-Z0-9\\.\\-]", "_");
+    }
+
     static void appendFileToFile(File src, File dst) throws IOException {
         FileInputStream in =  new FileInputStream(src);
         FileOutputStream out = new FileOutputStream(dst, true);
@@ -66,6 +86,9 @@ public class FileHandler {
     }
 
     static void deleteFile(String filename) {
+        for (File file : listVersions(filename)) {
+            file.delete();
+        }
         new File(getFilePath(filename)).delete();
     }
 
@@ -95,58 +118,56 @@ public class FileHandler {
         return signal;
     }
 
-    static int numVersions(File file) throws IOException {
-        Scanner scanner = new Scanner(file).useDelimiter(DELIMITER);
-        int versions = 0;
-        while(scanner.hasNext()) {
-            scanner.next();
-            versions++;
-        }
-        return versions;
+    static int numVersions(String filename) throws IOException {
+        File file = new File(getFilePath(filename));
+        if (file.isDirectory())
+            return file.list().length;
+        return 1;
     }
 
-    /*
-    getVersionContent:
-    returns a temporary file that contains the contents of the specified version of the file. This temp file
-    can be used to send data to another node. Uses a 32 bit delimiter specified in the constant "DELIMITER".
-    To handle the delimiter, each byte must be read one by one until a sequence of 4 bytes matches the delimiter.
-    The purpose of the 32 bit delimiter is to be extremely robust in the content that this versioning system handles.
-     */
-    static File getVersionContent(File file, int version) throws IOException {
-        Scanner scanner = new Scanner(file).useDelimiter(DELIMITER);
-        for (int i = 0; i < version - 1; i++) {
-            scanner.next();
-        }
-        // Read until the next delimiter while writing to tmp file
-        File tmpFile = File.createTempFile(file.getName(), "");
-        tmpFile.deleteOnExit();
-        FileWriter out = new FileWriter(tmpFile);
-        if (scanner.hasNext()) {
-            out.write(scanner.next());
-            out.flush();
-        } else {
-            byte[] buffer = new byte[BUFFER_SIZE];
-            FileInputStream in = new FileInputStream(file);
-            FileOutputStream fos = new FileOutputStream(tmpFile);
-            int count;
-            while ((count = in.read(buffer)) > 0)
-                fos.write(buffer, 0, count);
-        }
-        return tmpFile;
+    static File getVersionContent(String filename, int version) throws IOException {
+        File[] versions = listVersions(filename);
+
+        Arrays.sort(versions, new Comparator<File>(){
+            public int compare(File f1, File f2) {
+                return Long.valueOf(f1.lastModified()).compareTo(f2.lastModified());
+            }
+        });
+        return versions[version];
     }
 
     static void sendFile(File file, Socket socket, int version) throws IOException {
+        sendFile(file.getName(), socket, version);
+    }
+
+    static void sendFile(String filename, Socket socket, int version) throws IOException {
         // Instantiate streams
-        File fileVersion;
-        if (version == -1) {
-            fileVersion = file;
-        } else {
-            fileVersion = getVersionContent(file, version);
-        }
+        File fileVersion = getVersionContent(filename, version);
         FileInputStream in = new FileInputStream(fileVersion);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
         long numBytes = fileVersion.length();
+        // Handle empty files by throwing an exception
+        if (numBytes <= 0) {
+            fileVersion.delete();
+            throw new IOException("Tried to send empty file");
+        }
+        out.writeLong(numBytes);
+
+        // Send the file
+        int count;
+        byte[] buffer = new byte[BUFFER_SIZE];
+        while ((count = in.read(buffer)) > 0) {
+            out.write(buffer, 0, count);
+        }
+    }
+
+    static void sendFile(File file, Socket socket) throws IOException {
+        // Instantiate streams
+        FileInputStream in = new FileInputStream(file);
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+
+        long numBytes = file.length();
         // Handle empty files by throwing an exception
         if (numBytes <= 0) {
             file.delete();
@@ -162,12 +183,48 @@ public class FileHandler {
         }
     }
 
-    static void sendFile(String filename, Socket socket, int version) throws IOException {
-        sendFile(new File(getFilePath(filename)), socket, version);
+    static void sendAllVersions(String filename, Socket socket) throws IOException {
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+        out.writeInt(numVersions(filename));
+        for (File file : listVersions(filename)) {
+            FileInputStream in = new FileInputStream(file);
+
+            long numBytes = file.length();
+            // Handle empty files by throwing an exception
+            if (numBytes <= 0) {
+                file.delete();
+                throw new IOException("Tried to send empty file");
+            }
+            out.writeLong(numBytes);
+
+            // Send the file
+            int count;
+            byte[] buffer = new byte[BUFFER_SIZE];
+            while ((count = in.read(buffer)) > 0) {
+                out.write(buffer, 0, count);
+            }
+        }
     }
 
-    static void receiveFile(File file, Socket socket, boolean append) throws IOException {
-        FileOutputStream out = new FileOutputStream(file, append);
+    static void sendAllVersions(File file, Socket socket) throws IOException {
+        sendAllVersions(file.getName(), socket);
+    }
+
+    static void receiveVersions(String filename, Socket socket) throws IOException {
+        DataInputStream in = new DataInputStream(socket.getInputStream());
+        int numVersions = in.readInt();
+        if (!FileHandler.fileExists(filename))
+            new File(getFilePath(filename)).mkdirs();
+        for (int i = 0; i < numVersions; i++) {
+            receiveFile(new File(getNewFilePath(filename)), socket);
+        }
+    }
+
+
+    static void receiveFile(File file, Socket socket) throws IOException {
+        if (file.isDirectory())
+            file = new File(getNewFilePath(file.getName()));
+        FileOutputStream out = new FileOutputStream(file);
         DataInputStream in = new DataInputStream(socket.getInputStream());
 
         long numBytes = in.readLong();
@@ -180,11 +237,10 @@ public class FileHandler {
             if ((numBytes -= count) == 0)
                 break;
         }
-        if (append) out.write(DELIMITER.getBytes());
     }
 
-    static void receiveFile(String filename, Socket socket, boolean append) throws IOException {
-        receiveFile(new File(getFilePath(filename)), socket, append);
+    static void receiveFile(String filename, Socket socket) throws IOException {
+        receiveFile(new File(getFilePath(filename)), socket);
     }
 
 }

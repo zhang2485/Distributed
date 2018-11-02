@@ -299,7 +299,7 @@ class ServerResponseThread extends Thread {
                     try {
                         File tmpFile = File.createTempFile(cmds[2], "");
                         tmpFile.deleteOnExit();
-                        FileHandler.receiveFile(tmpFile, socket, true);
+                        FileHandler.receiveFile(tmpFile, socket);
                         Server.writeToLog(String.format("Saved file to temp location: %s", tmpFile.getAbsolutePath()));
 
                         // Receive signal to save or delete
@@ -338,8 +338,8 @@ class ServerResponseThread extends Thread {
                  */
                 case "get":
                     try {
-                        int versions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
-                        FileHandler.sendFile(cmds[1], socket, versions);
+                        int versions = FileHandler.numVersions(cmds[1]);
+                        FileHandler.sendFile(cmds[1], socket, versions - 1);
                         Server.writeToLog(String.format("Sent file: %s", cmds[1]));
                     } catch (FileNotFoundException e) {
                         // If we could not find the file on our sdfs, then simply close socket to signal DNE
@@ -354,7 +354,7 @@ class ServerResponseThread extends Thread {
                 */
                 case "get-versions":
                     try {
-                        int numVersions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
+                        int numVersions = FileHandler.numVersions(cmds[1]);
                         Server.writeToLog(String.format("get-versions numVersions: %d", numVersions));
                         int numVersionsRequested = Integer.parseInt(cmds[2]);
                         Server.writeToLog(String.format("get-versions numVersionsRequested: %d", numVersionsRequested));
@@ -364,17 +364,15 @@ class ServerResponseThread extends Thread {
                         Server.writeToLog(String.format("get-versions tmpFile: %s", tmpFile.getAbsolutePath()));
                         if (numVersions - numVersionsRequested > -1) {
                             Server.writeToLog("get-versions: Concatenating versions to a temp file");
+                            FileOutputStream out = new FileOutputStream(tmpFile, true);
                             for (int i = numVersions - numVersionsRequested; i < numVersions; i++) {
-                                int version = i + 1; // i + 1 because versions are 1-indexed
-                                String filePath = FileHandler.getFilePath(cmds[1]);
-                                File versionFile = FileHandler.getVersionContent(new File(filePath), version);
-                                FileWriter out = new FileWriter(versionFile);
-                                out.write(FileHandler.DELIMITER);
+                                File versionFile = FileHandler.getVersionContent(cmds[1], i);
                                 FileHandler.appendFileToFile(versionFile, tmpFile);
-                                Server.writeToLog(String.format("get-versions appended version: %d", version));
+                                out.write(FileHandler.DELIMITER.getBytes());
+                                Server.writeToLog(String.format("get-versions appended version: %d", i));
                             }
                             Server.writeToLog(String.format("get-versions Sending concatenated versions: %s", tmpFile.getAbsolutePath()));
-                            FileHandler.sendFile(tmpFile, socket, -1);
+                            FileHandler.sendFile(tmpFile, socket);
                         } else {
                             Server.writeToLog("get-versions: Client requested too many versions");
                             socket.close();
@@ -419,10 +417,16 @@ class FailureReplicaSendThread extends FailureDetectionThread {
                             socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
                             Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
                             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                            DataInputStream in = new DataInputStream(socket.getInputStream());
                             out.writeUTF(file.getName());
-                            Server.writeToLog(String.format("Sent %s to %s", file.getName(), Server.group.get(i)));
-                            FileHandler.sendFile(file, socket, -1); // Send entire file
-                            Server.writeToLog("Sent re-replication file");
+                            boolean sendOrNot = in.readBoolean();
+                            if (sendOrNot) {
+                                Server.writeToLog(String.format("Sending %s to %s", file.getName(), Server.group.get(i)));
+                                FileHandler.sendAllVersions(file, socket); // Send entire file
+                                Server.writeToLog("Sent re-replication file");
+                            } else {
+                                Server.writeToLog("Did not send re-replication file");
+                            }
                         }
                     }
                 }
@@ -454,7 +458,7 @@ class FailureReplicaCleanupThread extends Thread {
                             Server.writeToLog(String.format("Deleting-group: %s", Server.group.toString()));
                             Server.writeToLog(String.format("Deleting-myIndex: %d", myIndex));
                             Server.writeToLog(String.format("Deleting-Server.ip: %s", Server.ip));
-                            file.delete();
+                            FileHandler.deleteFile(file.getName());
                         }
                     }
                 }
@@ -485,12 +489,15 @@ class FailureReplicaReceiveThread extends Thread {
                 Socket socket = serverSocket.accept();
                 Server.writeToLog("Got connection for re-replication");
                 DataInputStream in = new DataInputStream(socket.getInputStream());
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                 String filename = in.readUTF().trim();
                 Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
                 if (!FileHandler.fileExists(filename)) {
-                    FileHandler.receiveFile(filename, socket, false);
+                    out.writeBoolean(true);
+                    FileHandler.receiveVersions(filename, socket);
                     Server.writeToLog(String.format("Saved re-replication file: %s", filename));
                 } else {
+                    out.writeBoolean(false);
                     Server.writeToLog(String.format("Re-replication file already exists: %s", filename));
                 }
             } catch (IOException e) {
@@ -517,7 +524,8 @@ class ReplicaReceiveThread extends Thread {
         try {
             if (FileHandler.receiveReplicaSignal()) {
                 // Signaled to save
-                FileHandler.appendFileToFile(file, new File(FileHandler.getFilePath(filename)));
+                String newFileName = FileHandler.getNewFilePath(filename);
+                file.renameTo(new File(newFileName));
                 writer.writeBytes("File saved ACK");
                 Server.writeToLog("Received replica signal to save");
             } else {

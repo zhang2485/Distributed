@@ -146,7 +146,7 @@ class queryThread extends Thread implements Runnable {
                     break;
                 case "get":
                     try {
-                        FileHandler.receiveFile(components[2], socket, false);
+                        FileHandler.receiveFile(components[2], socket);
                         sb.append("Received file!\n");
                         synchronized (System.out) {
                             System.out.println(sb.toString());
@@ -160,7 +160,7 @@ class queryThread extends Thread implements Runnable {
                     return;
                 case "get-versions":
                     try {
-                        FileHandler.receiveFile(components[3], socket, false);
+                        FileHandler.receiveFile(components[3], socket);
                         sb.append("Received file!\n");
                         synchronized (System.out) {
                             System.out.println(sb.toString());
