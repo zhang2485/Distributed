@@ -126,8 +126,12 @@ public class FileHandler {
         return 1;
     }
 
-    static File getVersionContent(String filename, int version) throws IOException {
+    static File getVersionContent(String filename, int version) throws IOException, IndexOutOfBoundsException {
         File[] versions = listVersions(filename);
+        if (versions.length == 0) {
+            deleteFile(filename);
+            throw new IOException("There are no versions of this file");
+        }
 
         Arrays.sort(versions, new Comparator<File>(){
             public int compare(File f1, File f2) {
