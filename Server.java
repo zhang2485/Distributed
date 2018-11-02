@@ -387,7 +387,6 @@ class ServerResponseThread extends Thread {
             socket.close();
         } catch (IOException e) {
             Server.writeToLog(Server.getStackTrace(e));
-            socket.close();
         }
 
     }
