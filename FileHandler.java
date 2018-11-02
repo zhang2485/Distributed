@@ -3,6 +3,8 @@ import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Comparator;
 
@@ -65,9 +67,9 @@ public class FileHandler {
         return String.format("%s/%s", getDirectoryPath(), filename);
     }
 
-    static String getNewFilePath(String filename) {
+    static String getNewFilePath(String filename) throws IOException {
         if (!fileExists(filename))
-            new File(getFilePath(filename)).mkdirs();
+            Files.createDirectory(Paths.get(getFilePath(filename)));
         return String.format("%s/%s", getFilePath(filename), fileNameSafeString(Server.getCurrentDateAsString()));
     }
 
