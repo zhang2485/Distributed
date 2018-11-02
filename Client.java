@@ -49,6 +49,10 @@ public class Client {
             if (components[0].equals("put") || components[0].equals("get")) {
                 ret = cmd;
             }
+        } else if (components.length == 4) {
+            if (components[0].equals("get-versions")) {
+                ret = cmd;
+            }
         }
         return ret;
     }
@@ -140,6 +144,20 @@ class queryThread extends Thread implements Runnable {
                     }
                     break;
                 case "get":
+                    try {
+                        FileHandler.receiveFile(components[2], socket, false);
+                        sb.append("Received file!\n");
+                        synchronized (System.out) {
+                            System.out.println(sb.toString());
+                        }
+                    } catch (IOException e) {
+                        sb.append(e.getMessage() + "\n");
+                        synchronized (System.out) {
+                            System.out.println(sb.toString());
+                        }
+                    }
+                    return;
+                case "get-versions":
                     try {
                         FileHandler.receiveFile(components[2], socket, false);
                         sb.append("Received file!\n");

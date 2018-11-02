@@ -285,7 +285,6 @@ class ServerResponseThread extends Thread {
                 receives a file from the client.
                  */
                 case "put":
-                    Server.writeToLog(String.format("Received put command: '%s'", cmd));
                     try {
                         File tmpFile = File.createTempFile(cmds[2], "");
                         tmpFile.deleteOnExit();
@@ -327,7 +326,6 @@ class ServerResponseThread extends Thread {
                 sends a file to the client
                  */
                 case "get":
-                    Server.writeToLog(String.format("Received get command: '%s'", cmd));
                     try {
                         int versions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
                         FileHandler.sendFile(cmds[1], socket, versions);
@@ -336,6 +334,35 @@ class ServerResponseThread extends Thread {
                         // If we could not find the file on our sdfs, then simply close socket to signal DNE
                         socket.close();
                         Server.writeToLog(String.format("IOException: %s", e.getMessage()));
+                    }
+                    break;
+                /*
+                get-versions:
+                get all versions of a file
+                */
+                case "get-versions":
+                    try {
+                        int numVersions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
+                        int numVersionsRequested = Integer.parseInt(cmds[2]);
+                        // Concatenate all versions into a tmp file
+                        File tmpFile = File.createTempFile(cmds[2], "");
+                        tmpFile.deleteOnExit();
+                        if (numVersions - numVersionsRequested > -1) {
+                            Server.writeToLog("Concatenating versions to a temp file");
+                            for (int i = numVersions - numVersionsRequested; i < numVersions; i++) {
+                                String filePath = FileHandler.getFilePath(cmds[2]);
+                                // i + 1 because versions are 1-indexed
+                                File versionFile = FileHandler.getVersionContent(new File(filePath), i + 1, false);
+                                FileHandler.appendFileToFile(tmpFile, versionFile);
+                            }
+                            Server.writeToLog(String.format("Sending concatenated versions from: %s", tmpFile.getAbsolutePath()));
+                            FileHandler.sendFile(tmpFile, socket, -1);
+                        } else {
+                            Server.writeToLog("Client requested too many versions");
+                            socket.close();
+                        }
+                    } catch (IOException e) {
+                        Server.writeToLog(String.format("get-versions: %s", e.getMessage()));
                     }
                     break;
                 /*

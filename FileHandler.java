@@ -123,7 +123,7 @@ public class FileHandler {
     To handle the delimiter, each byte must be read one by one until a sequence of 4 bytes matches the delimiter.
     The purpose of the 32 bit delimiter is to be extremely robust in the content that this versioning system handles.
      */
-    static File getVersionContent(File file, int version) throws IOException {
+    static File getVersionContent(File file, int version, boolean truncate) throws IOException {
         byte[] singleByteBuffer = new byte[1];
         int delimiterIdx = 0;
         int currentVersion = 0;
@@ -160,7 +160,7 @@ public class FileHandler {
                 }
             }
         }
-        if (ranIntoDelimiter) truncateFile(tmpFile, DELIMITER.length);
+        if (ranIntoDelimiter && truncate) truncateFile(tmpFile, DELIMITER.length);
         return tmpFile;
     }
 
@@ -170,7 +170,7 @@ public class FileHandler {
         if (version == -1) {
             fileVersion = file;
         } else {
-            fileVersion = getVersionContent(file, version);
+            fileVersion = getVersionContent(file, version, true);
         }
         FileInputStream in = new FileInputStream(fileVersion);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
