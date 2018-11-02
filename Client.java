@@ -148,29 +148,24 @@ class queryThread extends Thread implements Runnable {
                     }
                     break;
                 case "get":
-                    try {
-                        DataInputStream in = new DataInputStream(socket.getInputStream());
-                        if (in.readBoolean()) {
-                            sb.append("Received ACK for file!\n");
-                            if (!read_quorum) {
-                                synchronized(lock) {
-                                    read_quorum = true;
-                                }
-                                FileHandler.receiveFile(components[2], socket);
-                                sb.append("Received file!\n");
-                            } else {
-                                sb.append("File already ACKED on another query thread\n");
-                                socket.close();
+                    DataInputStream in = new DataInputStream(socket.getInputStream());
+                    if (in.readBoolean()) {
+                        sb.append("Received ACK for file!\n");
+                        if (!read_quorum) {
+                            synchronized(lock) {
+                                read_quorum = true;
                             }
+                            FileHandler.receiveFile(components[2], socket);
+                            sb.append("Received file!\n");
+                        } else {
+                            sb.append("File already ACKED on another query thread\n");
+                            socket.close();
                         }
-                        synchronized (System.out) {
-                            System.out.println(sb.toString());
-                        }
-                    } catch (IOException e) {
-                        sb.append("File did not exist\n");
-                        synchronized (System.out) {
-                            System.out.println(sb.toString());
-                        }
+                    } else {
+                        sb.append("File did not exist");
+                    }
+                    synchronized (System.out) {
+                        System.out.println(sb.toString());
                     }
                     return;
                 case "get-versions":
