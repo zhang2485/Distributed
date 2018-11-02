@@ -111,6 +111,7 @@ public class Server {
             writeToLog(String.format("Requested removal of members list for %s but it wasn't there", ip));
         }
         logMemberList();
+        reReplicateFiles();
     }
 
     static void updateMemberList(String[] newList) throws IOException {
@@ -126,6 +127,37 @@ public class Server {
             connectTimes.put(ip, date);
         }
         logMemberList();
+        reReplicateFiles();
+    }
+
+    static void reReplicateFiles() throws IOException {
+        Server.writeToLog("Re-replicating files on my sdfs");
+        for (File file : FileHandler.getFiles()) {
+            Server.writeToLog(String.format("Re-replicating: %s", file.getName()));
+            for (int i = 0; i < Server.group.size(); i++) {
+                if (FileHandler.isReplicaNode(file.getName(), i)) {
+                    Server.writeToLog(String.format("Re-replicating %s on %s", file.getName(), Server.group.get(i)));
+                    Socket socket;
+                    boolean scanning = true;
+                    while(scanning) try {
+                        socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
+                        Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
+                        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                        out.writeUTF(file.getName());
+                        Server.writeToLog(String.format("Sent %s to %s", file.getName(), Server.group.get(i)));
+                        FileHandler.sendFile(file, socket, -1); // Send entire file
+                        Server.writeToLog("Sent re-replication file");
+                        scanning = false;
+                    } catch (ConnectException e) {
+                        try {
+                            Thread.sleep(2000); // 2 seconds
+                        } catch (InterruptedException ie) {
+                            ie.printStackTrace();
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private static void logMemberList() throws IOException {
