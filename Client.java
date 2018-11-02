@@ -160,13 +160,13 @@ class queryThread extends Thread implements Runnable {
                     return;
                 case "get-versions":
                     try {
-                        FileHandler.receiveFile(components[2], socket, false);
+                        FileHandler.receiveFile(components[3], socket, false);
                         sb.append("Received file!\n");
                         synchronized (System.out) {
                             System.out.println(sb.toString());
                         }
                     } catch (IOException e) {
-                        sb.append(e.getMessage() + "\n");
+                        sb.append(String.format("File did not exist %s\n", e.getMessage()));
                         synchronized (System.out) {
                             System.out.println(sb.toString());
                         }

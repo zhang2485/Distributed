@@ -343,22 +343,26 @@ class ServerResponseThread extends Thread {
                 case "get-versions":
                     try {
                         int numVersions = FileHandler.numVersions(new File(FileHandler.getFilePath(cmds[1])));
+                        Server.writeToLog(String.format("get-versions numVersions: %d", numVersions));
                         int numVersionsRequested = Integer.parseInt(cmds[2]);
+                        Server.writeToLog(String.format("get-versions numVersionsRequested: %d", numVersionsRequested));
                         // Concatenate all versions into a tmp file
                         File tmpFile = File.createTempFile(cmds[2], "");
+                        Server.writeToLog(String.format("get-versions tmpFile: %s", tmpFile.getAbsolutePath()));
                         tmpFile.deleteOnExit();
                         if (numVersions - numVersionsRequested > -1) {
-                            Server.writeToLog("Concatenating versions to a temp file");
+                            Server.writeToLog("get-versions: Concatenating versions to a temp file");
                             for (int i = numVersions - numVersionsRequested; i < numVersions; i++) {
+                                int version = i + 1; // i + 1 because versions are 1-indexed
                                 String filePath = FileHandler.getFilePath(cmds[2]);
-                                // i + 1 because versions are 1-indexed
-                                File versionFile = FileHandler.getVersionContent(new File(filePath), i + 1, false);
+                                File versionFile = FileHandler.getVersionContent(new File(filePath), version, false);
                                 FileHandler.appendFileToFile(tmpFile, versionFile);
+                                Server.writeToLog(String.format("get-versions appended version: %d", version));
                             }
-                            Server.writeToLog(String.format("Sending concatenated versions from: %s", tmpFile.getAbsolutePath()));
+                            Server.writeToLog(String.format("get-versions Sending concatenated versions from: %s", tmpFile.getAbsolutePath()));
                             FileHandler.sendFile(tmpFile, socket, -1);
                         } else {
-                            Server.writeToLog("Client requested too many versions");
+                            Server.writeToLog("get-versions: Client requested too many versions");
                             socket.close();
                         }
                     } catch (IOException e) {
@@ -408,7 +412,7 @@ class FailureReplicaSendThread extends Thread {
                         }
                     }
                 }
-                Thread.sleep(1000);
+                Thread.sleep(1500);
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             }
