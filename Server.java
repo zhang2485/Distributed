@@ -115,7 +115,6 @@ public class Server {
             writeToLog(String.format("Requested removal of members list for %s but it wasn't there", ip));
         }
         logMemberList();
-        new FailureReplicaSendThread().run();
     }
 
     static void updateMemberList(String[] newList) throws IOException {
@@ -131,7 +130,6 @@ public class Server {
             connectTimes.put(ip, date);
         }
         logMemberList();
-        new FailureReplicaSendThread().run();
     }
 
     private static void logMemberList() throws IOException {
@@ -153,6 +151,8 @@ public class Server {
 
         new FailureReplicaReceiveThread().start();
         new FailureReplicaCleanupThread().start();
+        new FailureReplicaSendThread().start();
+
         if (ip.equals(INTRODUCER_IP)) {
             // If I am the introducer machine
             addToMemberList(ip);
@@ -369,36 +369,39 @@ class ServerResponseThread extends Thread {
 class FailureReplicaSendThread extends Thread {
     @Override
     public void run() {
-        try {
-            Server.writeToLog("Re-replicating files on my sdfs");
-            for (File file : FileHandler.getFiles()) {
-                Server.writeToLog(String.format("Re-replicating: %s", file.getName()));
-                for (int i = 0; i < Server.group.size(); i++) {
-                    if (FileHandler.isReplicaNode(file.getName(), i)) {
-                        Server.writeToLog(String.format("Re-replicating %s on %s", file.getName(), Server.group.get(i)));
-                        Socket socket;
-                        boolean scanning = true;
-                        while(scanning) try {
-                            socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
-                            Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
-                            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                            out.writeUTF(file.getName());
-                            Server.writeToLog(String.format("Sent %s to %s", file.getName(), Server.group.get(i)));
-                            FileHandler.sendFile(file, socket, -1); // Send entire file
-                            Server.writeToLog("Sent re-replication file");
-                            scanning = false;
-                        } catch (ConnectException e) {
-                            try {
-                                Thread.sleep(2000); // 2 seconds
-                            } catch (InterruptedException ie) {
-                                ie.printStackTrace();
+        while (true) {
+            try {
+                Server.writeToLog("Re-replicating files on my sdfs");
+                for (File file : FileHandler.getFiles()) {
+                    Server.writeToLog(String.format("Re-replicating: %s", file.getName()));
+                    for (int i = 0; i < Server.group.size(); i++) {
+                        if (FileHandler.isReplicaNode(file.getName(), i)) {
+                            Server.writeToLog(String.format("Re-replicating %s on %s", file.getName(), Server.group.get(i)));
+                            Socket socket;
+                            boolean scanning = true;
+                            while(scanning) try {
+                                socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
+                                Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
+                                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                                out.writeUTF(file.getName());
+                                Server.writeToLog(String.format("Sent %s to %s", file.getName(), Server.group.get(i)));
+                                FileHandler.sendFile(file, socket, -1); // Send entire file
+                                Server.writeToLog("Sent re-replication file");
+                                scanning = false;
+                            } catch (ConnectException e) {
+                                try {
+                                    Thread.sleep(2000); // 2 seconds
+                                } catch (InterruptedException ie) {
+                                    ie.printStackTrace();
+                                }
                             }
                         }
                     }
                 }
+                Thread.sleep(1000);
+            } catch (IOException | InterruptedException e) {
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 }
