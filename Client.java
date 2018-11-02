@@ -65,6 +65,7 @@ public class Client {
             System.exit(0);
         }
         System.out.printf("================= %s =================\n", cmd);
+
         if (!commands.contains(cmds[0]) && checkCommand(cmd).equals("INVALID")) {
             System.out.printf("Type a valid command from %s%n", commands.toString());
             return;
@@ -139,8 +140,7 @@ class queryThread extends Thread implements Runnable {
                     try {
                         FileHandler.sendFile(components[1], socket, 0);
                     } catch (IOException e) {
-                        System.out.printf("File does not exist on local sdfs\n");
-                        FileHandler.deleteFile(components[1]);
+                        e.printStackTrace();
                         socket.close(); // Signal server to close the connection
                     }
                     break;
@@ -166,7 +166,7 @@ class queryThread extends Thread implements Runnable {
                             System.out.println(sb.toString());
                         }
                     } catch (IOException e) {
-                        sb.append(String.format("File did not exist %s\n", e.getMessage()));
+                        sb.append("File did not exists\n");
                         synchronized (System.out) {
                             System.out.println(sb.toString());
                         }

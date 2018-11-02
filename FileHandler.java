@@ -2,6 +2,7 @@ import java.io.*;
 import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Scanner;
 
 public class FileHandler {
     static final String USER_DIR = "user.dir";
@@ -9,7 +10,7 @@ public class FileHandler {
     static final int BUFFER_SIZE  = 2048;
     static final int REPLICA_PORT = 2018;
     static final int FAILURE_REPLICA_PORT = 5000;
-    static final byte[] DELIMITER = { (byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0x0A };
+    static final String DELIMITER = "--NEW FILE--\n";
 
     static File[] getFiles() {
         File directory = new File(getDirectoryPath());
@@ -94,24 +95,12 @@ public class FileHandler {
         return signal;
     }
 
-    static void truncateFile(File file, long numBytes) throws IOException {
-        RandomAccessFile raFile = new RandomAccessFile(file, "rwd");
-        raFile.setLength(file.length() - numBytes);
-    }
-
     static int numVersions(File file) throws IOException {
-        int delimiterIdx = 0;
-        byte[] singleByteBuffer = new byte[1];
+        Scanner scanner = new Scanner(file).useDelimiter(DELIMITER);
         int versions = 0;
-        FileInputStream in = new FileInputStream(file);
-        while (in.read(singleByteBuffer) > 0) {
-            if (singleByteBuffer[0] != DELIMITER[delimiterIdx++]) {
-                delimiterIdx = 0;
-            }
-            if (delimiterIdx == DELIMITER.length) {
-                versions++;
-                delimiterIdx = 0;
-            }
+        while(scanner.hasNext()) {
+            scanner.next();
+            versions++;
         }
         return versions;
     }
@@ -123,44 +112,23 @@ public class FileHandler {
     To handle the delimiter, each byte must be read one by one until a sequence of 4 bytes matches the delimiter.
     The purpose of the 32 bit delimiter is to be extremely robust in the content that this versioning system handles.
      */
-    static File getVersionContent(File file, int version, boolean truncate) throws IOException {
-        byte[] singleByteBuffer = new byte[1];
-        int delimiterIdx = 0;
-        int currentVersion = 0;
-
-        FileInputStream in = new FileInputStream(file);
-        while(currentVersion < version - 1) {
-            while (delimiterIdx < DELIMITER.length) {
-                // Read byte from file
-                in.read(singleByteBuffer);
-                if (singleByteBuffer[0] != DELIMITER[delimiterIdx++]) {
-                    delimiterIdx = 0;
-                }
-            }
-            currentVersion++;
-            delimiterIdx = 0;
+    static File getVersionContent(File file, int version) throws IOException {
+        Scanner scanner = new Scanner(file).useDelimiter(DELIMITER);
+        for (int i = 0; i < version - 1; i++) {
+            scanner.next();
         }
-
         // Read until the next delimiter while writing to tmp file
         File tmpFile = File.createTempFile(file.getName(), "");
         tmpFile.deleteOnExit();
-        FileOutputStream out = new FileOutputStream(tmpFile);
-        int numBytes;
-        boolean ranIntoDelimiter = false;
-        delimiterIdx = 0;
-        while ((numBytes = in.read(singleByteBuffer)) > 0) {
-            out.write(singleByteBuffer, 0, numBytes);
-
-            if (singleByteBuffer[0] != DELIMITER[delimiterIdx++])
-                delimiterIdx = 0;
-            else {
-                if (delimiterIdx == DELIMITER.length) {
-                    ranIntoDelimiter = true;
-                    break;
-                }
+        FileWriter out = new FileWriter(tmpFile);
+        if (scanner.hasNext()) {
+            out.write(scanner.next());
+        } else {
+            while (scanner.hasNextLine()) {
+                out.write(scanner.nextLine());
             }
         }
-        if (ranIntoDelimiter && truncate) truncateFile(tmpFile, DELIMITER.length);
+        out.flush();
         return tmpFile;
     }
 
@@ -170,14 +138,17 @@ public class FileHandler {
         if (version == -1) {
             fileVersion = file;
         } else {
-            fileVersion = getVersionContent(file, version, true);
+            fileVersion = getVersionContent(file, version);
         }
         FileInputStream in = new FileInputStream(fileVersion);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
         long numBytes = fileVersion.length();
         // Handle empty files by throwing an exception
-        if (numBytes <= 0) throw new IOException("Tried to send empty file");
+        if (numBytes <= 0) {
+            file.delete();
+            throw new IOException("Tried to send empty file");
+        }
         out.writeLong(numBytes);
 
         // Send the file
@@ -206,8 +177,7 @@ public class FileHandler {
             if ((numBytes -= count) == 0)
                 break;
         }
-        if (append)
-            out.write(DELIMITER, 0, DELIMITER.length);
+        if (append) out.write(DELIMITER.getBytes());
     }
 
     static void receiveFile(String filename, Socket socket, boolean append) throws IOException {

@@ -150,7 +150,6 @@ public class Server {
         ip = getIPAddress();
         // FileWriter object contains instance to log file for server
         log = new FileWriter(new File(getLogFileName()));
-        System.setOut(new PrintStream(new FileOutputStream(getLogFileName(), true)));
         writeToLog(String.format("Attempting to start server at: %s", ip));
 
         new FailureReplicaReceiveThread().start();
@@ -293,7 +292,8 @@ class ServerResponseThread extends Thread {
                     break;
                 /*
                 put:
-                receives a file from the client.
+                receives a file from the client. Saves the file to a tmp file and then saves the file into the sdfs
+                if the master node sends a signal to save, otherwise we delete the tmp file and move on.
                  */
                 case "put":
                     try {
@@ -307,7 +307,7 @@ class ServerResponseThread extends Thread {
                         receive.start();
                         Server.writeToLog("Started replica receive thread");
 
-                        // Master node needs to coordinate where files go
+                        // Master node needs to coordinate where files go by sending the save/delete signals
                         Server.writeToLog(String.format("Master node is: %s and my ip is %s", FileHandler.getMasterNodeIP(), Server.ip));
                         ReplicaMasterThread master = null;
                         if (Server.ip.equals(FileHandler.getMasterNodeIP())) {
@@ -349,7 +349,8 @@ class ServerResponseThread extends Thread {
                     break;
                 /*
                 get-versions:
-                get all versions of a file
+                get all versions of a file. Writes all versions to a temporary file and then sends that temp file
+                back to the client.
                 */
                 case "get-versions":
                     try {
@@ -366,7 +367,9 @@ class ServerResponseThread extends Thread {
                             for (int i = numVersions - numVersionsRequested; i < numVersions; i++) {
                                 int version = i + 1; // i + 1 because versions are 1-indexed
                                 String filePath = FileHandler.getFilePath(cmds[1]);
-                                File versionFile = FileHandler.getVersionContent(new File(filePath), version, false);
+                                File versionFile = FileHandler.getVersionContent(new File(filePath), version);
+                                FileWriter out = new FileWriter(versionFile);
+                                out.write(FileHandler.DELIMITER);
                                 FileHandler.appendFileToFile(versionFile, tmpFile);
                                 Server.writeToLog(String.format("get-versions appended version: %d", version));
                             }
