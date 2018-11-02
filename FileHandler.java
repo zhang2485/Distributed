@@ -9,7 +9,7 @@ public class FileHandler {
     static final int BUFFER_SIZE  = 2048;
     static final int REPLICA_PORT = 2018;
     static final int FAILURE_REPLICA_PORT = 5000;
-    static final byte[] DELIMITER = { (byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF };
+    static final byte[] DELIMITER = { (byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0x0A };
 
     static File[] getFiles() {
         File directory = new File(getDirectoryPath());
