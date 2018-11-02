@@ -424,6 +424,8 @@ class FailureReplicaCleanupThread extends Thread {
                         }
                     }
                 } else {
+                    Server.writeToLog(String.format("My group: %s", Server.group.toString()));
+                    Server.writeToLog(String.format("My ip: %s", Server.ip));
                     Server.writeToLog("My index is -1");
                 }
                 Thread.sleep(500);
