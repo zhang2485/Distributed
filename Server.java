@@ -545,8 +545,14 @@ class ReplicaMasterThread extends Thread {
         try {
             // Give the signal to either save or delete the temporary file
             for (int i = 0; i < Server.group.size(); i++) {
-                Server.writeToLog(String.format("Sending replica signal to %s", Server.group.get(i)));
-                FileHandler.sendReplicaSignal(Server.group.get(i), (FileHandler.isReplicaNode(this.filename, i)));
+                boolean signal = FileHandler.isReplicaNode(filename, i);
+                Server.writeToLog(String.format("Master-thread-filename: %s", filename));
+                Server.writeToLog(String.format("Master-thread-hashcode: %s", filename.hashCode()));
+                Server.writeToLog(String.format("Master-thread-file-node: %d", FileHandler.getNodeFromFile(filename)));
+                Server.writeToLog(String.format("Master-thread-group: %s", Server.group.toString()));
+                Server.writeToLog(String.format("Master-thread-i: %d", i));
+                Server.writeToLog(String.format("Master-thread-Server.ip: %s", Server.group.get(i)));
+                FileHandler.sendReplicaSignal(Server.group.get(i), signal);
                 Server.writeToLog(String.format("Sent replica signal to %s", Server.group.get(i)));
             }
         } catch (IOException e) {
