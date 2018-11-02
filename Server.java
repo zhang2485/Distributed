@@ -485,14 +485,12 @@ class FailureReplicaReceiveThread extends Thread {
                 Server.writeToLog("Got connection for re-replication");
                 DataInputStream in = new DataInputStream(socket.getInputStream());
                 String filename = in.readUTF().trim();
-                if (FileHandler.isReplicaNode(filename, Server.group.indexOf(Server.ip))) {
-                    Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
-                    if (!FileHandler.fileExists(filename)) {
-                        FileHandler.receiveFile(filename, socket, false);
-                        Server.writeToLog(String.format("Saved re-replication file: %s", filename));
-                    } else {
-                        Server.writeToLog(String.format("Re-replication file already exists: %s", filename));
-                    }
+                Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
+                if (!FileHandler.fileExists(filename)) {
+                    FileHandler.receiveFile(filename, socket, false);
+                    Server.writeToLog(String.format("Saved re-replication file: %s", filename));
+                } else {
+                    Server.writeToLog(String.format("Re-replication file already exists: %s", filename));
                 }
             } catch (IOException e) {
                 Server.writeToLog(e);
