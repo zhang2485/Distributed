@@ -147,7 +147,7 @@ class queryThread extends Thread implements Runnable {
                             System.out.println(sb.toString());
                         }
                     } catch (IOException e) {
-                        sb.append("File did not exist on remote sdfs\n");
+                        sb.append(e.getMessage() + "\n");
                         synchronized (System.out) {
                             System.out.println(sb.toString());
                         }
