@@ -343,7 +343,6 @@ class ServerResponseThread extends Thread {
                         Server.writeToLog(String.format("Sent file: %s", cmds[1]));
                     } catch (FileNotFoundException e) {
                         // If we could not find the file on our sdfs, then simply close socket to signal DNE
-                        writer.writeBytes("-----not found");
                         socket.close();
                         Server.writeToLog(String.format("IOException: %s", e.getMessage()));
                     }
@@ -378,7 +377,6 @@ class ServerResponseThread extends Thread {
                             socket.close();
                         }
                     } catch (FileNotFoundException e) {
-                        writer.writeBytes("-----not found");
                         socket.close();
                     }
                     break;

@@ -152,7 +152,7 @@ class queryThread extends Thread implements Runnable {
                             System.out.println(sb.toString());
                         }
                     } catch (IOException e) {
-                        sb.append(e.getMessage() + "\n");
+                        sb.append("File did not exist\n");
                         synchronized (System.out) {
                             System.out.println(sb.toString());
                         }
