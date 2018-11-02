@@ -524,10 +524,15 @@ class ReplicaReceiveThread extends Thread {
         try {
             if (FileHandler.receiveReplicaSignal()) {
                 // Signaled to save
-                String newFileName = FileHandler.getNewFilePath(filename);
-                file.renameTo(new File(newFileName));
-                writer.writeBytes("File saved ACK");
                 Server.writeToLog("Received replica signal to save");
+                String newFilePath = FileHandler.getNewFilePath(filename);
+                Server.writeToLog("Saving file to " + newFilePath);
+                boolean success = file.renameTo(new File(newFilePath));
+                if (success) {
+                    writer.writeBytes("File saved ACK");
+                } else {
+                    writer.writeBytes("File failed to save ACK");
+                }
             } else {
                 // Signaled to delete
                 file.delete();
