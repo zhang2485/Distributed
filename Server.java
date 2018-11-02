@@ -145,6 +145,7 @@ public class Server {
         System.setOut(new PrintStream(new FileOutputStream(getLogFileName(), true)));
         writeToLog(String.format("Attempting to start server at: %s", ip));
 
+        new FailureReplicaThread().start();
         if (ip.equals(INTRODUCER_IP)) {
             // If I am the introducer machine
             addToMemberList(ip);
@@ -388,6 +389,42 @@ class ReplicaReceiveThread extends Thread {
         }
     }
 }
+
+class FailureReplicaThread extends Thread {
+    ServerSocket serverSocket;
+
+    public FailureReplicaThread() {
+        try {
+            serverSocket = new ServerSocket(FileHandler.FAILURE_REPLICA_PORT);
+            Server.writeToLog("Instantiated failure replica receive server socket");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                Socket socket = serverSocket.accept();
+                Server.writeToLog("Got connection for re-replication");
+                DataInputStream in = new DataInputStream(socket.getInputStream());
+                String filename = in.readUTF().trim();
+                Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
+                if (!FileHandler.fileExists(filename)) {
+                    FileHandler.receiveFile(filename, socket, false);
+                    Server.writeToLog(String.format("Saved re-replication file: %s", filename));
+                } else {
+                    Server.writeToLog(String.format("Re-replication file already exists: %s", filename));
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+}
+
 
 class ReplicaMasterThread extends Thread {
     String filename;
