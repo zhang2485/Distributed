@@ -85,12 +85,16 @@ public class Server {
         return dateFormatter.format(new Date());
     }
 
-    static void writeToLog(String msg) throws IOException {
-        String date = getCurrentDateAsString();
-        String constructedLog = String.format("%s: %s\n", date, msg);
-        System.out.print(constructedLog);
-        log.write(constructedLog);
-        log.flush();
+    static void writeToLog(String msg) {
+        try {
+            String date = getCurrentDateAsString();
+            String constructedLog = String.format("%s: %s\n", date, msg);
+            System.out.print(constructedLog);
+            log.write(constructedLog);
+            log.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     static void addToMemberList(String ip) throws IOException {
@@ -402,11 +406,7 @@ class FailureReplicaSendThread extends Thread {
 class FailureReplicaCleanupThread extends Thread {
 
     public FailureReplicaCleanupThread() {
-        try {
-            Server.writeToLog("Instantiated FailureReplicaCleanupThread");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        Server.writeToLog("Instantiated FailureReplicaCleanupThread");
     }
 
     @Override
@@ -429,8 +429,8 @@ class FailureReplicaCleanupThread extends Thread {
                     Server.writeToLog("My index is -1");
                 }
                 Thread.sleep(500);
-            } catch (IOException | InterruptedException e) {
-                e.printStackTrace();
+            } catch (InterruptedException e) {
+                Server.writeToLog(String.format("My: %s", e.getMessage()));
             }
         }
     }
@@ -520,11 +520,7 @@ class ReplicaMasterThread extends Thread {
                 Server.writeToLog(String.format("Sent replica signal to %s", Server.group.get(i)));
             }
         } catch (IOException e) {
-            try {
-                Server.writeToLog(e.getMessage());
-            } catch (IOException ee) {
-                ee.printStackTrace();
-            }
+            Server.writeToLog(e.getMessage());
         }
     }
 }
