@@ -329,10 +329,13 @@ class ServerResponseThread extends Thread {
                 case "get":
                     try {
                         if (FileHandler.fileExists(cmds[1])) {
+                            Server.writeToLog("get: File exists and i'm signalling that I have it");
                             writer.writeBoolean(true);
+                            Server.writeToLog("get: signaled yes");
                             int versions = FileHandler.numVersions(cmds[1]);
+                            Server.writeToLog("get: sending file");
                             FileHandler.sendFile(cmds[1], socket, versions - 1);
-                            Server.writeToLog(String.format("Sent file: %s", cmds[1]));
+                            Server.writeToLog(String.format("get: sent file %s", cmds[1]));
                         }
                     } catch (FileNotFoundException e) {
                         // If we could not find the file on our sdfs, then simply close socket to signal DNE
