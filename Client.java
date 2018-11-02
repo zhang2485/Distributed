@@ -132,6 +132,7 @@ class queryThread extends Thread implements Runnable {
         try {
             socket = new Socket(ip, port);
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             writer = new DataOutputStream(socket.getOutputStream());
             sb.append(String.format("%s\n", ip));
 
@@ -148,18 +149,17 @@ class queryThread extends Thread implements Runnable {
                     }
                     break;
                 case "get":
-                    DataInputStream in = new DataInputStream(socket.getInputStream());
                     if (in.readBoolean()) {
                         sb.append("Received ACK for file!\n");
-                        if (!read_quorum) {
-                            synchronized(lock) {
+                        synchronized(lock) {
+                            if (!read_quorum) {
                                 read_quorum = true;
+                                FileHandler.receiveFile(components[2], socket);
+                                sb.append("Received file!\n");
+                            } else {
+                                sb.append("File already ACKED on another query thread\n");
+                                socket.close();
                             }
-                            FileHandler.receiveFile(components[2], socket);
-                            sb.append("Received file!\n");
-                        } else {
-                            sb.append("File already ACKED on another query thread\n");
-                            socket.close();
                         }
                     } else {
                         sb.append("File did not exist");
@@ -169,17 +169,23 @@ class queryThread extends Thread implements Runnable {
                     }
                     return;
                 case "get-versions":
-                    try {
-                        FileHandler.receiveFile(components[3], socket);
-                        sb.append("Received file!\n");
-                        synchronized (System.out) {
-                            System.out.println(sb.toString());
+                    if (in.readBoolean()) {
+                        sb.append("Received ACK for file!\n");
+                        synchronized(lock) {
+                            if (!read_quorum) {
+                                read_quorum = true;
+                                FileHandler.receiveFile(components[3], socket);
+                                sb.append("Received file!\n");
+                            } else {
+                                sb.append("File already ACKED on another query thread\n");
+                                socket.close();
+                            }
                         }
-                    } catch (IOException e) {
-                        sb.append("File did not exists\n");
-                        synchronized (System.out) {
-                            System.out.println(sb.toString());
-                        }
+                    } else {
+                        sb.append("File did not exist");
+                    }
+                    synchronized (System.out) {
+                        System.out.println(sb.toString());
                     }
                     return;
                 default:
