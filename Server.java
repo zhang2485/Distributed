@@ -19,7 +19,6 @@ public class Server {
     public static final int SERVER_PORT = 2017;
     volatile static String ip;
     volatile static ArrayList<String> group = new ArrayList<>();
-    private volatile static HashMap<String, String> connectTimes = new HashMap<>();
     private static ServerSocket serverSocket;
     static String machine;
     private static FileWriter log;
@@ -101,7 +100,6 @@ public class Server {
         group.add(ip);
         group = removeDuplicatesAndSort(group);
         String date = getCurrentDateAsString();
-        connectTimes.put(ip, date);
         writeToLog(String.format("Added %s to member list", ip));
         logMemberList();
     }
@@ -124,11 +122,6 @@ public class Server {
     private static void updateMemberList(ArrayList<String> newList) throws IOException {
         writeToLog("Received update by membership list");
         group = removeDuplicatesAndSort(newList);
-        for (int i = 0; i < Server.group.size(); i++) {
-            String ip = Server.group.get(i);
-            String date = getCurrentDateAsString();
-            connectTimes.put(ip, date);
-        }
         logMemberList();
     }
 
@@ -378,23 +371,13 @@ class FailureReplicaSendThread extends Thread {
                         if (FileHandler.isReplicaNode(file.getName(), i)) {
                             Server.writeToLog(String.format("Re-replicating %s on %s", file.getName(), Server.group.get(i)));
                             Socket socket;
-                            boolean scanning = true;
-                            while(scanning) try {
-                                socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
-                                Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
-                                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                                out.writeUTF(file.getName());
-                                Server.writeToLog(String.format("Sent %s to %s", file.getName(), Server.group.get(i)));
-                                FileHandler.sendFile(file, socket, -1); // Send entire file
-                                Server.writeToLog("Sent re-replication file");
-                                scanning = false;
-                            } catch (ConnectException e) {
-                                try {
-                                    Thread.sleep(2000);
-                                } catch (InterruptedException ie) {
-                                    ie.printStackTrace();
-                                }
-                            }
+                            socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
+                            Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
+                            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                            out.writeUTF(file.getName());
+                            Server.writeToLog(String.format("Sent %s to %s", file.getName(), Server.group.get(i)));
+                            FileHandler.sendFile(file, socket, -1); // Send entire file
+                            Server.writeToLog("Sent re-replication file");
                         }
                     }
                 }
@@ -438,6 +421,43 @@ class FailureReplicaCleanupThread extends Thread {
     }
 }
 
+class FailureReplicaReceiveThread extends Thread {
+    ServerSocket serverSocket;
+
+    public FailureReplicaReceiveThread() {
+        try {
+            serverSocket = new ServerSocket(FileHandler.FAILURE_REPLICA_PORT);
+            Server.writeToLog("Instantiated failure replica receive server socket");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                Socket socket = serverSocket.accept();
+                Server.writeToLog("Got connection for re-replication");
+                DataInputStream in = new DataInputStream(socket.getInputStream());
+                String filename = in.readUTF().trim();
+                if (FileHandler.isReplicaNode(filename, Server.group.indexOf(Server.ip))) {
+                    Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
+                    if (!FileHandler.fileExists(filename)) {
+                        FileHandler.receiveFile(filename, socket, false);
+                        Server.writeToLog(String.format("Saved re-replication file: %s", filename));
+                    } else {
+                        Server.writeToLog(String.format("Re-replication file already exists: %s", filename));
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+}
+
 class ReplicaReceiveThread extends Thread {
     File file;
     String filename;
@@ -468,42 +488,6 @@ class ReplicaReceiveThread extends Thread {
         }
     }
 }
-
-class FailureReplicaReceiveThread extends Thread {
-    ServerSocket serverSocket;
-
-    public FailureReplicaReceiveThread() {
-        try {
-            serverSocket = new ServerSocket(FileHandler.FAILURE_REPLICA_PORT);
-            Server.writeToLog("Instantiated failure replica receive server socket");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    @Override
-    public void run() {
-        while (true) {
-            try {
-                Socket socket = serverSocket.accept();
-                Server.writeToLog("Got connection for re-replication");
-                DataInputStream in = new DataInputStream(socket.getInputStream());
-                String filename = in.readUTF().trim();
-                Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
-                if (!FileHandler.fileExists(filename)) {
-                    FileHandler.receiveFile(filename, socket, false);
-                    Server.writeToLog(String.format("Saved re-replication file: %s", filename));
-                } else {
-                    Server.writeToLog(String.format("Re-replication file already exists: %s", filename));
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-}
-
 
 class ReplicaMasterThread extends Thread {
     String filename;
