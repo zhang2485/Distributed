@@ -4,6 +4,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -56,7 +57,7 @@ public class FileHandler {
     }
 
     static boolean fileExists(String filename) {
-        return new File(getFilePath(filename)).exists();
+        return Files.exists(Paths.get(getFilePath(filename)));
     }
 
     static String getDirectoryPath() {
@@ -87,11 +88,12 @@ public class FileHandler {
         }
     }
 
-    static void deleteFile(String filename) {
-        for (File file : listVersions(filename)) {
-            file.delete();
-        }
-        new File(getFilePath(filename)).delete();
+    static void deleteFile(String filename) throws IOException {
+        Path rootPath = Paths.get(getFilePath(filename));
+        Files.walk(rootPath)
+                .sorted(Comparator.reverseOrder())
+                .map(Path::toFile)
+                .forEach(File::delete);
     }
 
     static void sendReplicaSignal(String ip, boolean signal) throws IOException {
