@@ -169,7 +169,7 @@ class queryThread extends Thread implements Runnable {
                         synchronized(lock) {
                             if (!read_quorum) {
                                 read_quorum = true;
-                                FileHandler.receiveFile(components[3], socket);
+                                FileHandler.receiveFile(String.format("../%s", components[3]), socket);
                                 sb.append("Received file!\n");
                             } else {
                                 sb.append("File already ACKED on another query thread\n");
