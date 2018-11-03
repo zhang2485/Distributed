@@ -45,7 +45,6 @@ class FileHandler {
         FileInputStream in = new FileInputStream(file);
         long numBytes = file.length();
         out.writeLong(numBytes);
-
         // Send the file
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
@@ -55,16 +54,56 @@ class FileHandler {
         in.close();
     }
 
+    static void sendFile(String filename, Socket socket, int v) throws IOException {
+        // Instantiate streams
+        File file = new File(getFilePath(filename));
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+        if(!file.exists()) {
+        	String dne = "DNE";
+        	byte[] buff = dne.getBytes();
+        	out.write(buff, 0, buff.length);
+        	out.close();
+        	return;
+        }
+        String content = new String(Files.readAllBytes(file.toPath()));
+        String [] versions = content.split("[|]");
+        System.out.println(versions.length);
+        int startIndex = versions.length - v;
+        StringBuilder sb = new StringBuilder();
+        while(startIndex < versions.length) {
+        	sb.append(versions[startIndex]);
+        	if(startIndex != versions.length - 1) {
+        		sb.append("[|]");
+        	}
+        	startIndex++;
+        }
+        String output = sb.toString();
+        long numBytes = output.length();
+        out.writeLong(numBytes);
+
+        // Send the file
+        byte[] buffer = output.getBytes();
+        int count = buffer.length;
+        out.write(buffer, 0, count);
+    }
+    
     static void receiveFile(String filename, Socket socket) throws IOException {
         // Instantiate streams
-        FileOutputStream out = new FileOutputStream(getFilePath(filename));
+    	File f = new File(getFilePath(filename));
+    	boolean exists = f.exists();
+        FileOutputStream out = new FileOutputStream(getFilePath(filename), exists);
         DataInputStream in = new DataInputStream(socket.getInputStream());
-
+        Server.writeToLog("Instantiated Streams");
         long numBytes = in.readLong();
 
         // Receive and write to file
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
+        if(exists) {
+        	String delim = "[|]";
+        	byte [] b = delim.getBytes();
+        	out.write(b, 0, b.length);
+        }
         while ((count = in.read(buffer)) > 0) {
             out.write(buffer, 0, count);
             numBytes -= count;
@@ -442,33 +481,43 @@ class ServerResponseThread extends Thread {
                     // Simple in design effective in accomplishing the task
                     System.out.println(Server.group);
                     System.out.println(Server.ip);
-                    if(Server.group.get(Server.group.size() - 1).trim().equals(Server.ip.trim())) {
-                    	List<String> temp = new ArrayList<String>(Server.group);
-                    	Collections.shuffle(temp);
-                    	temp = temp.subList(0, 3);
-                    	String chosen = String.join(",", temp);
-                        byte[] buf = chosen.getBytes();
-                        DatagramSocket sock = new DatagramSocket();
-                        for(int i = 0; i < Server.group.size(); i++) {
-	                        InetAddress IP = InetAddress.getByName(Server.group.get(i));
-	                        if(Server.group.get(i).equals(Server.ip.trim())) {
-	                        	continue;
+                    if(Server.fileList.containsKey(cmds[2])) {
+                    	String ips = Server.fileList.get(cmds[2]);
+                    	if(ips.contains(Server.ip)) {
+                    		FileHandler.receiveFile(cmds[2], socket);
+                    	}
+                    	else {
+                    		FileHandler.emptyPipe(cmds[2], socket);
+                    	}
+                    }else {
+	                    if(Server.group.get(Server.group.size() - 1).trim().equals(Server.ip.trim())) {
+	                    	List<String> temp = new ArrayList<String>(Server.group);
+	                    	Collections.shuffle(temp);
+	                    	temp = temp.subList(0, 3);
+	                    	String chosen = String.join(",", temp);
+	                        byte[] buf = chosen.getBytes();
+	                        DatagramSocket sock = new DatagramSocket();
+	                        for(int i = 0; i < Server.group.size(); i++) {
+		                        InetAddress IP = InetAddress.getByName(Server.group.get(i));
+		                        if(Server.group.get(i).equals(Server.ip.trim())) {
+		                        	continue;
+		                        }
+		                        DatagramPacket packet = new DatagramPacket(buf, buf.length, IP, 1234);
+		                        sock.send(packet);
+		                        Thread.sleep(600);
 	                        }
-	                        DatagramPacket packet = new DatagramPacket(buf, buf.length, IP, 1234);
-	                        sock.send(packet);
-	                        Thread.sleep(600);
-                        }
-                        sock.close();
-                        if(chosen.contains(Server.ip.trim())) {
-                        	FileHandler.receiveFile(cmds[2], socket);
-                        }
-                        else {
-                        	FileHandler.emptyPipe(cmds[2], socket);
-                        }
-                        Server.fileList.put(cmds[2], chosen);
-                    }
-                    else {
-                    	FileHandler.potentialFile(cmds[2], socket);
+	                        sock.close();
+	                        if(chosen.contains(Server.ip.trim())) {
+	                        	FileHandler.receiveFile(cmds[2], socket);
+	                        }
+	                        else {
+	                        	FileHandler.emptyPipe(cmds[2], socket);
+	                        }
+	                        Server.fileList.put(cmds[2], chosen);
+	                    }
+	                    else {
+	                    	FileHandler.potentialFile(cmds[2], socket);
+	                    }
                     }
                     writer.writeBytes("RECIEVED");
                     break;
@@ -477,9 +526,14 @@ class ServerResponseThread extends Thread {
                 sends a file to the client
                  */
                 case "get":
-                    Server.writeToLog(String.format("Received get command: '%s'", cmd));
-                    FileHandler.sendFile(cmds[1], socket);
-                    Server.writeToLog(String.format("Sent file: %s", cmds[1]));
+	                Server.writeToLog(String.format("Received get command: '%s'", cmd));
+	                FileHandler.sendFile(cmds[1], socket, 1);
+	                Server.writeToLog(String.format("Sent file: %s", cmds[1]));
+                    break;
+                case "get-versions":
+	                Server.writeToLog(String.format("Received get command: '%s'", cmd));
+	                FileHandler.sendFile(cmds[1], socket, Integer.parseInt(cmds[2]));
+	                Server.writeToLog(String.format("Sent file: %s", cmds[1]));
                     break;
                 default:
                     Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));
