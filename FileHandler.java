@@ -108,11 +108,7 @@ public class FileHandler {
             out.writeBoolean(signal);
             scanning = false;
         } catch (ConnectException e) {
-            try {
-                Thread.sleep(2000); //2 seconds
-            } catch (InterruptedException ie) {
-                ie.printStackTrace();
-            }
+            continue;
         }
     }
 
