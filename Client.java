@@ -199,7 +199,11 @@ class queryThread extends Thread implements Runnable {
         } catch (IOException e) {
             System.out.printf("Could not query to %s due to ", ip);
             e.printStackTrace();
+        }
+        try {
             socket.close();
+        } catch (IOException e) {
+            System.out.println("Could not close socket");
         }
         synchronized (System.out) {
             System.out.println(sb.toString());
