@@ -204,7 +204,6 @@ class queryThread extends Thread implements Runnable {
             sb.append("Server closed socket signalling DNE\n");
         } catch (SocketException e) {
             sb.append("This node does not hold the replica\n");
-        }
         } catch (IOException e) {
             System.out.printf("Could not query to %s due to ", ip);
             e.printStackTrace();
