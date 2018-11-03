@@ -471,7 +471,7 @@ class FailureReplicaCleanupThread extends Thread {
                     }
                 }
                 Thread.sleep(500);
-            } catch (InterruptedException e) {
+            } catch (IOException | InterruptedException e) {
                 Server.writeToLog(e.getMessage());
             }
         }
