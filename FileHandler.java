@@ -72,6 +72,8 @@ public class FileHandler {
         if (!fileExists(filename))
             Files.createDirectory(Paths.get(getFilePath(filename)));
         String newFilePath = String.format("%s/%s", getFilePath(filename), fileNameSafeString(Server.getCurrentDateAsString()));
+        while (Files.exists(Paths.get(newFilePath)));
+            newFilePath = String.format("%s/%s", getFilePath(filename), fileNameSafeString(Server.getCurrentDateAsString()));
         return Files.createFile(Paths.get(newFilePath));
     }
 
