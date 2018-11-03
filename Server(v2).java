@@ -36,7 +36,7 @@ class FileHandler {
         File file = new File(getFilePath(filename));
         String container = Server.fileList.get(filename);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        if(!file.exists() || !container.contains(Server.ip)) {
+        if(!file.exists() || (container!= null && container.contains(Server.ip))) {
         	String dne = "DNE";
         	byte[] buff = dne.getBytes();
         	out.write(buff, 0, buff.length);
@@ -60,7 +60,7 @@ class FileHandler {
         File file = new File(getFilePath(filename));
         String container = Server.fileList.get(filename);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        if(!file.exists() || !container.contains(Server.ip)) {
+        if(!file.exists() || (container!= null && container.contains(Server.ip))) {
         	String dne = "DNE";
         	byte[] buff = dne.getBytes();
         	out.write(buff, 0, buff.length);
