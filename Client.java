@@ -143,11 +143,7 @@ class queryThread extends Thread implements Runnable {
             // Handle extra logic needed by commands
             switch (components[0]) {
                 case "put":
-                    try {
-                        FileHandler.sendFile(components[1], socket, 0);
-                    } catch (IOException e) {
-                        sb.append("Server closed connection\n");
-                    }
+                    FileHandler.sendFile(components[1], socket, 0);
                     break;
                 case "get":
                     if (in.readBoolean()) {
