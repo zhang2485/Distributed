@@ -195,10 +195,6 @@ class queryThread extends Thread implements Runnable {
             while ((line = reader.readLine()) != null)
                 sb.append(String.format("%s\n", line));
 
-            synchronized (System.out) {
-                System.out.println(sb.toString());
-            }
-
             socket.close();
         } catch (EOFException e) {
             sb.append("Server closed socket signalling DNE\n");
