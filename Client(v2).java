@@ -105,7 +105,8 @@ public class Client {
             "get sdfsfilename localfilename",
             "ls sdsfilename",
             "store",
-            "delete sdsfilename"
+            "delete sdsfilename",
+            "get-versions sdfsfilename numversions localfilename"
     ));
     private static String lastInput;
 
@@ -131,6 +132,10 @@ public class Client {
                 ret = cmd;
             }
 
+        } else if(components.length == 4) {
+        	if(components[0].equals("get-versions") && components[2].matches("-?\\d+")) {
+        		ret = cmd;
+        	}
         }
         return ret;
     }
@@ -217,6 +222,13 @@ class queryThread extends Thread implements Runnable {
                     break;
                 case "get":
                     clientFileHandler.receiveFile(components[2], socket);
+                    sb.append("Received file!\n");
+                    synchronized (System.out) {
+                        System.out.println(sb.toString());
+                    }
+                    return;
+                case "get-versions":
+                    clientFileHandler.receiveFile(components[3], socket);
                     sb.append("Received file!\n");
                     synchronized (System.out) {
                         System.out.println(sb.toString());
