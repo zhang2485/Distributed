@@ -68,10 +68,11 @@ public class FileHandler {
         return String.format("%s/%s", getDirectoryPath(), filename);
     }
 
-    static String getNewFilePath(String filename) throws IOException {
+    static Path getNewFilePath(String filename) throws IOException {
         if (!fileExists(filename))
             Files.createDirectory(Paths.get(getFilePath(filename)));
-        return String.format("%s/%s", getFilePath(filename), fileNameSafeString(Server.getCurrentDateAsString()));
+        String newFilePath = String.format("%s/%s", getFilePath(filename), fileNameSafeString(Server.getCurrentDateAsString()));
+        return Files.createFile(Paths.get(newFilePath));
     }
 
     static String fileNameSafeString(String filename) {
@@ -193,7 +194,7 @@ public class FileHandler {
     }
 
     static void receiveFile(String filename, Socket socket) throws IOException {
-        File file = new File(getNewFilePath(filename));
+        File file = getNewFilePath(filename).toFile();
         FileOutputStream out = new FileOutputStream(file);
         DataInputStream in = new DataInputStream(socket.getInputStream());
 
