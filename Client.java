@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.*;
 
 public class Client {
@@ -201,6 +202,9 @@ class queryThread extends Thread implements Runnable {
             socket.close();
         } catch (EOFException e) {
             sb.append("Server closed socket signalling DNE\n");
+        } catch (SocketException e) {
+            sb.append("This node does not hold the replica\n");
+        }
         } catch (IOException e) {
             System.out.printf("Could not query to %s due to ", ip);
             e.printStackTrace();
