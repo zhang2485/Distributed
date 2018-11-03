@@ -23,6 +23,7 @@ public class Server {
     private static ServerSocket serverSocket;
     static String machine;
     private static FileWriter log;
+    private static final boolean DEBUG = false;
 
     private static ArrayList<String> removeDuplicatesAndSort(ArrayList<String> list) {
         Set<String> set = new HashSet<>(list);
@@ -98,11 +99,13 @@ public class Server {
 
     static void writeToLog(String msg) {
         try {
-            String date = getCurrentDateAsString();
-            String constructedLog = String.format("%s: %s\n", date, msg);
-            System.out.print(constructedLog);
-            log.write(constructedLog);
-            log.flush();
+            if (DEBUG) {
+                String date = getCurrentDateAsString();
+                String constructedLog = String.format("%s: %s\n", date, msg);
+                System.out.print(constructedLog);
+                log.write(constructedLog);
+                log.flush();
+            }
         } catch (IOException e) {
             Server.writeToLog(e);
         }
