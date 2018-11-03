@@ -34,8 +34,9 @@ class FileHandler {
     static void sendFile(String filename, Socket socket) throws IOException {
         // Instantiate streams
         File file = new File(getFilePath(filename));
+        String container = Server.fileList.get(filename);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        if(!file.exists()) {
+        if(!file.exists() || !container.contains(Server.ip)) {
         	String dne = "DNE";
         	byte[] buff = dne.getBytes();
         	out.write(buff, 0, buff.length);
@@ -57,8 +58,9 @@ class FileHandler {
     static void sendFile(String filename, Socket socket, int v) throws IOException {
         // Instantiate streams
         File file = new File(getFilePath(filename));
+        String container = Server.fileList.get(filename);
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        if(!file.exists()) {
+        if(!file.exists() || !container.contains(Server.ip)) {
         	String dne = "DNE";
         	byte[] buff = dne.getBytes();
         	out.write(buff, 0, buff.length);
@@ -73,7 +75,7 @@ class FileHandler {
         while(startIndex < versions.length) {
         	sb.append(versions[startIndex]);
         	if(startIndex != versions.length - 1) {
-        		sb.append("[|]");
+        		sb.append("|");
         	}
         	startIndex++;
         }
@@ -100,7 +102,7 @@ class FileHandler {
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
         if(exists) {
-        	String delim = "[|]";
+        	String delim = "|";
         	byte [] b = delim.getBytes();
         	out.write(b, 0, b.length);
         }
