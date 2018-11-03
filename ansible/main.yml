@@ -5,12 +5,12 @@
       repo_name: ece428
       repo_url: https://gitlab+deploy-token-23:pxBVyuFxHyRpvy7riw4D@gitlab.engr.illinois.edu/azhang38/cs425-mp3.git
       repo_remote: origin
-      repo_branch: dylan
+      repo_branch: testing
       git_directory: /home/dphuang2
       java_main_class: Server
   tasks:
       - name: get the code
-        git: repo={{repo_url}} dest={{git_directory}}/{{repo_name}} version={{repo_branch}}
+        git: repo={{repo_url}} dest={{git_directory}}/{{repo_name}} version={{repo_branch}} force=yes
       - name: remake files
         make:
             chdir: "{{git_directory}}/{{repo_name}}"
