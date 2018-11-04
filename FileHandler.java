@@ -19,7 +19,8 @@ public class FileHandler {
     static final int FAILURE_REPLICA_PORT = 5000;
     static final String DELIMITER = "\n--NEW FILE--\n";
 
-    static File[] getFiles() {
+    static File[] getFiles() throws IOException {
+        Files.createDirectories(Paths.get(getDirectoryPath()));
         File directory = new File(getDirectoryPath());
         return directory.listFiles();
     }
@@ -41,7 +42,7 @@ public class FileHandler {
         return abs((filename.hashCode() % 10) % Server.group.size());
     }
 
-    static void printFiles() {
+    static void printFiles() throws IOException {
         for (File f : getFiles())
             System.out.println(f.getName());
     }
@@ -70,7 +71,7 @@ public class FileHandler {
 
     static Path getNewFilePath(String filename) throws IOException {
         if (!fileExists(filename))
-            Files.createDirectory(Paths.get(getFilePath(filename)));
+            Files.createDirectories(Paths.get(getFilePath(filename)));
         String newFilePath = String.format("%s/%s", getFilePath(filename), fileNameSafeString(Server.getCurrentDateAsString()));
         while (Files.exists(Paths.get(newFilePath)));
             newFilePath = String.format("%s/%s", getFilePath(filename), fileNameSafeString(Server.getCurrentDateAsString()));
