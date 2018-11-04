@@ -195,7 +195,7 @@ class queryThread extends Thread implements Runnable {
         } catch (EOFException e) {
             sb.append("Server closed socket signalling DNE\n");
         } catch (SocketException e) {
-            switch (components[1]) {
+            switch (components[0]) {
                 case "put":
                     sb.append("This node does not hold the replica\n");
                     break;
