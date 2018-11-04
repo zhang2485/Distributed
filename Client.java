@@ -169,7 +169,7 @@ class queryThread extends Thread implements Runnable {
                         synchronized(lock) {
                             if (!read_quorum) {
                                 read_quorum = true;
-                                FileHandler.receiveFile(String.format("../%s", components[3]), socket);
+                                FileHandler.receiveFile("../" + components[3], socket);
                                 sb.append("Received file!\n");
                             } else {
                                 sb.append("File already ACKED on another query thread\n");
@@ -195,15 +195,17 @@ class queryThread extends Thread implements Runnable {
         } catch (EOFException e) {
             sb.append("Server closed socket signalling DNE\n");
         } catch (SocketException e) {
-            sb.append("This node does not hold the replica\n");
+            switch (components[1]) {
+                case "put":
+                    sb.append("This node does not hold the replica\n");
+                    break;
+                default:
+                    sb.append(String.format("Could not connect to %s\n", ip));
+                    break;
+            }
         } catch (IOException e) {
-            System.out.printf("Could not query to %s due to ", ip);
+            System.out.printf("Could not query %s due to ", ip);
             e.printStackTrace();
-        }
-        try {
-            socket.close();
-        } catch (IOException e) {
-            System.out.println("Could not close socket");
         }
         synchronized (System.out) {
             System.out.println(sb.toString());
