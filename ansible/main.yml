@@ -10,7 +10,7 @@
       java_main_class: Server
   tasks:
       - name: get the code
-        git: repo={{repo_url}} dest={{git_directory}}/{{repo_name}} version={{repo_branch}}
+        git: repo={{repo_url}} dest={{git_directory}}/{{repo_name}} version={{repo_branch}} force=yes
       - name: remake files
         make:
             chdir: "{{git_directory}}/{{repo_name}}"
