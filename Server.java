@@ -23,7 +23,7 @@ public class Server {
     private static ServerSocket serverSocket;
     static String machine;
     private static FileWriter log;
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     private static ArrayList<String> removeDuplicatesAndSort(ArrayList<String> list) {
         Set<String> set = new HashSet<>(list);
