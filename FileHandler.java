@@ -93,11 +93,10 @@ public class FileHandler {
     }
 
     static void deleteFile(String filename) throws IOException {
-        Path rootPath = Paths.get(getFilePath(filename));
-        Files.walk(rootPath)
-                .sorted(Comparator.reverseOrder())
-                .map(Path::toFile)
-                .forEach(File::delete);
+        for (File file : listVersions(filename)) {
+            file.delete();
+        }
+        new File(getFilePath(filename)).delete();
     }
 
     static void sendReplicaSignal(String ip, boolean signal) throws IOException {
