@@ -1,11 +1,213 @@
 import java.io.*;
 import java.net.*;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.nio.file.Files;
+
+import static java.lang.Math.abs;
+
+class FileHandler {
+    static final String USER_DIR = "user.dir";
+    static final String SDFS_DIR = "sdfs";
+    static final int BUFFER_SIZE  = 1000000;
+    static final int REPLICA_PORT = 2118;
+    static final int FAILURE_REPLICA_PORT = 5001;
+    static final String DELIMITER = "\n--NEW FILE--\n";
+
+    static File[] getFiles() throws IOException {
+        Files.createDirectories(Paths.get(getDirectoryPath()));
+        File directory = new File(getDirectoryPath());
+        return directory.listFiles();
+    }
+
+    static File[] listVersions(String filename) {
+        File file = new File(getFilePath(filename));
+        if (file.isDirectory()) {
+            return file.listFiles();
+        }
+        return new File[]{file};
+    }
+
+
+    static String getMasterNodeIP() {
+        return Server.group.get(0);
+    }
+
+    static int getNodeFromFile(String filename) {
+        return abs((filename.hashCode() % 10) % Server.group.size());
+    }
+
+    static void printFiles() throws IOException {
+        for (File f : getFiles())
+            System.out.println(f.getName());
+    }
+
+    static boolean isReplicaNode(String filename, int idx) {
+        int numReplicas = 4;
+        int lower = getNodeFromFile(filename);
+        int upper = (lower + numReplicas) % Server.group.size();
+        if (lower < upper) {
+            return idx >= lower && idx < upper;
+        }
+        return idx < upper || idx >= lower;
+    }
+
+    static boolean fileExists(String filename) {
+        return Files.exists(Paths.get(getFilePath(filename)));
+    }
+
+    static String getDirectoryPath() {
+        return String.format("%s/%s", System.getProperty(USER_DIR), SDFS_DIR);
+    }
+
+    static String getFilePath(String filename) {
+        return String.format("%s/%s", getDirectoryPath(), filename);
+    }
+
+    static Path getNewFilePath(String filename) throws IOException {
+        if (!fileExists(filename))
+            Files.createDirectories(Paths.get(getFilePath(filename)));
+        String newFilePath = String.format("%s/%s", getFilePath(filename), fileNameSafeString(Server.getCurrentDateAsString()));
+        while (Files.exists(Paths.get(newFilePath)));
+            newFilePath = String.format("%s/%s", getFilePath(filename), fileNameSafeString(Server.getCurrentDateAsString()));
+        return Files.createFile(Paths.get(newFilePath));
+    }
+
+    static String fileNameSafeString(String filename) {
+        return filename.replaceAll("[^a-zA-Z0-9\\.\\-]", "_");
+    }
+
+    static void appendFileToFile(File src, File dst) throws IOException {
+        FileInputStream in =  new FileInputStream(src);
+        FileOutputStream out = new FileOutputStream(dst, true);
+        byte[] buffer = new byte[BUFFER_SIZE];
+        int count;
+        while ((count = in.read(buffer)) > 0) {
+            out.write(buffer, 0, count);
+        }
+    }
+
+    static void deleteFile(String filename) throws IOException {
+        for (File file : listVersions(filename)) {
+            file.delete();
+        }
+        new File(getFilePath(filename)).delete();
+    }
+
+    static void sendReplicaSignal(String ip, boolean signal) throws IOException {
+        boolean scanning = true;
+        Socket socket;
+        while(scanning) try {
+            socket = new Socket(ip, REPLICA_PORT);
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            out.writeBoolean(signal);
+            scanning = false;
+        } catch (ConnectException e) {
+            continue;
+        }
+    }
+
+    static boolean receiveReplicaSignal() throws IOException {
+        ServerSocket serverSocket = new ServerSocket(REPLICA_PORT);
+        Socket socket = serverSocket.accept();
+        DataInputStream in = new DataInputStream(socket.getInputStream());
+        boolean signal = in.readBoolean();
+        serverSocket.close();
+        return signal;
+    }
+
+    static int numVersions(String filename) throws IOException {
+        File file = new File(getFilePath(filename));
+        if (file.isDirectory())
+            return file.list().length;
+        return 1;
+    }
+
+    static File getVersionContent(String filename, int version) throws IOException, IndexOutOfBoundsException {
+        File[] versions = listVersions(filename);
+        if (versions.length == 0) {
+            deleteFile(filename);
+            throw new IOException("There are no versions of this file");
+        }
+
+        Arrays.sort(versions, new Comparator<File>(){
+            public int compare(File f1, File f2) {
+                return Long.valueOf(f1.lastModified()).compareTo(f2.lastModified());
+            }
+        });
+        return versions[version];
+    }
+
+    static void sendFile(File file, Socket socket, int version) throws IOException {
+        sendFile(file.getName(), socket, version);
+    }
+
+    static void sendFile(String filename, Socket socket, int version) throws IOException {
+        // Instantiate streams
+        File fileVersion = getVersionContent(filename, version);
+        FileInputStream in = new FileInputStream(fileVersion);
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+
+        long numBytes = fileVersion.length();
+        // Handle empty files by throwing an exception
+        if (numBytes <= 0) {
+            fileVersion.delete();
+            throw new IOException("Tried to send empty file");
+        }
+        out.writeLong(numBytes);
+
+        // Send the file
+        int count;
+        byte[] buffer = new byte[BUFFER_SIZE];
+        while ((count = in.read(buffer)) > 0) {
+            out.write(buffer, 0, count);
+        }
+    }
+
+    static void sendFile(File file, Socket socket) throws IOException {
+        // Instantiate streams
+        FileInputStream in = new FileInputStream(file);
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+
+        long numBytes = file.length();
+        // Handle empty files by throwing an exception
+        if (numBytes <= 0) {
+            file.delete();
+            throw new IOException("Tried to send empty file");
+        }
+        out.writeLong(numBytes);
+
+        // Send the file
+        int count;
+        byte[] buffer = new byte[BUFFER_SIZE];
+        while ((count = in.read(buffer)) > 0) {
+            out.write(buffer, 0, count);
+        }
+
+    }
+
+    static void receiveFile(String filename, Socket socket) throws IOException {
+        File file = getNewFilePath(filename).toFile();
+        FileOutputStream out = new FileOutputStream(file);
+        DataInputStream in = new DataInputStream(socket.getInputStream());
+
+        long numBytes = in.readLong();
+
+        // Receive and write to file
+        int count;
+        byte[] buffer = new byte[BUFFER_SIZE];
+        while ((count = in.read(buffer)) > 0) {
+            out.write(buffer, 0, count);
+            if ((numBytes -= count) == 0)
+                break;
+        }
+    }
+
+}
 
 public class Server {
     static final String IP_DELIMITER = " ";
@@ -17,7 +219,7 @@ public class Server {
 //    private static final String INTRODUCER_IP = "172.31.98.6";
 
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ss.SSS");
-    public static final int SERVER_PORT = 2017;
+    public static final int SERVER_PORT = 2217;
     volatile static String ip;
     volatile static ArrayList<String> group = new ArrayList<>();
     private static ServerSocket serverSocket;
@@ -156,10 +358,6 @@ public class Server {
         log = new FileWriter(new File(getLogFileName()));
         writeToLog(String.format("Attempting to start server at: %s", ip));
 
-        new FailureReplicaReceiveThread().start();
-        new FailureReplicaCleanupThread().start();
-        new FailureReplicaSendThread().start();
-
         if (ip.equals(INTRODUCER_IP)) {
             // If I am the introducer machine
             addToMemberList(ip);
@@ -201,12 +399,198 @@ public class Server {
     public static void main(String args[]) throws IOException, InterruptedException {
         setupServer();
         serverSocket = new ServerSocket(SERVER_PORT);
+        System.out.println("Looking for new connection on server");
         while (true) {
             writeToLog("Looking for new connection on server");
             ServerResponseThread srt = new ServerResponseThread(serverSocket.accept());
             srt.run();
         }
     }
+}
+
+/*
+ * Worker thread processes the storm instructions
+ */
+class boltThread extends Thread {
+	int port = 6425;
+	String inst;
+	String [] bolts;
+	DataOutputStream writer;
+	public boltThread(String inst, DataOutputStream writer) {
+		System.out.println("BOLT THREAD");
+		inst = inst.replace("crane", "");
+		inst = inst.trim();
+		this.inst = inst.split("<>")[0];
+		bolts = this.inst.split(",");
+		this.writer = writer;
+	}
+	
+	public ArrayList<String> filter(String regex, ArrayList<String> lines){
+		for(int i = 0; i < lines.size(); i++) {
+			String line = lines.get(i);
+			if(!line.contains(regex)) {
+				lines.remove(i);
+				i = i - 1;
+			}
+		}
+		return lines;
+	}
+	
+	public ArrayList<String> transform(String regex, String replace, ArrayList<String> lines){
+		for(int i = 0; i < lines.size(); i++) {
+			String line = lines.get(i);
+			line = line.replace(regex,  replace);
+			lines.set(i, line);
+		}
+		return lines;
+	}
+	
+	public ArrayList<String> transform(String function, ArrayList<String> lines){
+		if(function.contains("upper")) {
+			for(int i = 0; i < lines.size(); i++) {
+				String line = lines.get(i);
+				line = line.toUpperCase();
+				lines.set(i, line);
+			}
+		}
+		else if(function.contains("lower")) {
+			for(int i = 0; i < lines.size(); i++) {
+				String line = lines.get(i);
+				line = line.toLowerCase();
+				lines.set(i, line);
+			}
+		}
+		return lines;
+	}
+	
+	public void run() {
+		try {
+			ServerSocket ss = new ServerSocket(port);
+			Socket s = ss.accept();
+			/*
+			 * Obtain list of tuples to process
+			 */
+			ArrayList<String> lines = new ArrayList<>();
+			BufferedReader br = new BufferedReader(new InputStreamReader(s.getInputStream()));
+			while(!br.ready()) {
+				// Wait for the file to perform bolts on
+			}
+			String line = null;
+			while((line = br.readLine())!=null) {
+				System.out.println(line);
+				lines.add(line + '\n');
+			}
+			/*
+			 * Every worker will perform all of the bolts in chained order
+			 * declared by user
+			 */
+			for(int i = 0; i < bolts.length; i++) {
+				String instruction = bolts[i];
+				System.out.println(instruction);
+				String [] parts = instruction.split(" ");
+				if(parts[0].contains("filter")) {
+					String regex = parts[1];
+					lines = filter(regex, lines);
+				}
+				else if(parts[0].contains("transform")) {
+					if(parts.length==2) {
+						//apply a string function
+						lines = transform(parts[1], lines);
+					}
+					else {
+						//transform from one substring to another
+						lines = transform(parts[1], parts[2], lines);
+					}
+				}
+			}
+			/*
+			 * Transform arrayList back into string after all bolts have finished 
+			 */
+			StringBuilder sb = new StringBuilder();
+			for(String l: lines) {
+				sb.append(l);
+			}
+			
+			/*
+			 * Return the finished string to the user
+			 */
+			writer.write(sb.toString().getBytes());
+			ss.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+}
+
+/*
+ * Spout thread splits the static database 
+ * file into even parts and evenly distributes the work
+ * among the worker nodes.
+ */
+class spoutThread extends Thread{
+	int port = 6425;
+	String inst;
+	String db;
+	/**
+	 *  Converts the chunks into strings before sending them 
+	 *  to worker threads for processing
+	 * @param lines
+	 * @return string
+	 */
+	public String convertToString(List<String> lines) {
+		StringBuilder sb = new StringBuilder();
+		for(String line: lines) {
+			sb.append(line + '\n');
+		}
+		return new String(sb);
+	}
+	/*
+	 * Spout thread opens up database from the instruction set
+	 */
+	public spoutThread(String inst) {
+		System.out.println("SPOUT THREAD");
+		this.inst = inst;
+		System.out.println(inst);
+		this.db = inst.split("<>")[1];
+	}
+	
+	public void run() {
+		try {
+			/*
+			 * partition database into even blocks, evenly split
+			 * between active worker nodes that are not spouts
+			 */
+			List<String> lines = Files.readAllLines(Paths.get(db), StandardCharsets.UTF_8);
+			String names = lines.remove(0);
+			int partitions = Server.group.size() - 1;
+			int partition = lines.size()/partitions;
+			List<List<String>> blocks = new LinkedList<List<String>>();
+			ArrayList<String> cpy = new ArrayList<>(Server.group);
+			// Remove spout ip from copy of group (only keep worker nodes)
+			cpy.remove(Server.ip.trim());
+			for (int i = 0; i < lines.size(); i += partition) {
+			    blocks.add(lines.subList(i, Math.min(i + partition, lines.size())));
+			}
+			/*
+			 * Send each worker node a copy of evenly divided stream
+			 * from static database
+			 */
+			for(int i = 0; i < cpy.size(); i++) {
+				Socket spout = new Socket(cpy.get(i), 6425);
+				DataOutputStream writer = new DataOutputStream(spout.getOutputStream());
+				String stream = convertToString(blocks.get(i));
+				writer.write(stream.getBytes());
+				spout.close();
+			}
+			
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+	
 }
 
 class ServerResponseThread extends Thread {
@@ -219,12 +603,38 @@ class ServerResponseThread extends Thread {
     @Override
     public void run() {
         try {
+        	System.out.println("GET COMMAND");
             DataInputStream reader = new DataInputStream(socket.getInputStream());
             DataOutputStream writer = new DataOutputStream(socket.getOutputStream());
             String cmd = reader.readUTF().trim();
             Server.writeToLog(String.format("Got command: %s", cmd));
+            cmd = cmd.trim();
             String[] cmds = cmd.split(" ");
             switch (cmds[0]) {
+            		/*
+            		 * crane:
+            		 * initializes spoutThread or boltThread to perform crane operations on 
+            		 * a database, returns row results to the client
+            		 */
+            		case "crane":
+            			//Remove crane from commands list
+            			cmds[0] = "";
+            			cmd = String.join(" ", cmds);
+            			cmd = cmd.trim();
+            			if(Server.ip.equals(Server.group.get(1))) {
+            				//Spout thread for assigning work to workers
+            				spoutThread sT = new spoutThread(cmd);
+            				sT.start();
+            				sT.join();
+            			}
+            			else {
+            				//Bolt thread to initiate workers.
+            				boltThread bT = new boltThread(cmd, writer);
+            				bT.start();
+            				bT.join();
+            			}
+            			break;
+           
                 /*
                  *  print:
                  *  This command prints out the current membership list on every available server
@@ -400,7 +810,7 @@ class ServerResponseThread extends Thread {
                     break;
             }
             socket.close();
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException e) {
             Server.writeToLog(e);
         }
 
@@ -717,10 +1127,10 @@ class ConnectThread extends FailureDetectionThread implements Runnable {
  * Contains a helper functions for UDP programming
  */
 class SocketHelper {
-    static final int CONNECT_PORT = 2020;
-    static final int INTRODUCER_PORT = 2012;
-    static final int PING_PORT = 2010;
-    static final int ACK_PORT = 2011;
+    static final int CONNECT_PORT = 14120;
+    static final int INTRODUCER_PORT = 14112;
+    static final int PING_PORT = 14110;
+    static final int ACK_PORT = 14111;
     Random random = new Random();
 
     private final int BUFFER_SIZE = 4096;
@@ -758,4 +1168,3 @@ class SocketHelper {
         socket.close();
     }
 }
-
