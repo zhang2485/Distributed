@@ -3,35 +3,88 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.*;
 
+class clientFileHandler {
+    static final String DIRECTORY = "user.dir";
+    static final int BUFFER_SIZE  = 2048;
+
+    static File[] getFiles() {
+        File directory = new File(System.getProperty(DIRECTORY));
+        return directory.listFiles();
+    }
+
+    static void printFiles() {
+        for (File f : getFiles())
+            System.out.println(f.getName());
+    }
+
+    static boolean fileExists(String filename) {
+        for (File f: getFiles()) {
+            if (f.getName().equals(filename)) return true;
+        }
+        return false;
+    }
+
+    static String getFilePath(String filename) {
+        return String.format("%s/%s", System.getProperty(DIRECTORY), filename);
+    }
+
+    static void sendFile(String filename, Socket socket) throws IOException {
+        // Instantiate streams
+        File file = new File(getFilePath(filename));
+        FileInputStream in = new FileInputStream(file);
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+
+        long numBytes = file.length();
+        out.writeLong(numBytes);
+
+        // Send the file
+        int count;
+        byte[] buffer = new byte[BUFFER_SIZE];
+        while ((count = in.read(buffer)) > 0) {
+            out.write(buffer, 0, count);
+            if(in.available() == 0) {
+            	System.out.println("45");
+            	break;
+            }
+        }
+    }
+
+    static void receiveFile(String filename, Socket socket) throws IOException {
+        // Instantiate streams
+        FileOutputStream out = null;
+        DataInputStream in = new DataInputStream(socket.getInputStream());
+
+        long numBytes = in.readLong();
+
+        // Receive and write to file
+        int count;
+        byte[] buffer = new byte[BUFFER_SIZE];
+        boolean first = true;
+        while ((count = in.read(buffer)) > 0) {
+        	if(first) {
+        		first = false;
+        		String check = new String(buffer);
+        		if(check.trim().equals("DNE")) {
+        			System.out.println("DNE SUCCEEDED");
+        			break;
+        		}
+        		out = new FileOutputStream(getFilePath(filename));
+        	}
+            out.write(buffer, 0, count);
+            numBytes -= count;
+            if (numBytes == 0)
+                break;
+        }
+    }
+}
+
 public class Client {
 
-    private static final String[] serverList = {
-            "fa18-cs425-g77-01.cs.illinois.edu",
-            "fa18-cs425-g77-02.cs.illinois.edu",
-            "fa18-cs425-g77-03.cs.illinois.edu",
-            "fa18-cs425-g77-04.cs.illinois.edu",
-            "fa18-cs425-g77-05.cs.illinois.edu",
-            "fa18-cs425-g77-06.cs.illinois.edu",
-            "fa18-cs425-g77-07.cs.illinois.edu",
-            "fa18-cs425-g77-08.cs.illinois.edu",
-            "fa18-cs425-g77-09.cs.illinois.edu",
-            "fa18-cs425-g77-10.cs.illinois.edu"
     };
 //    static final String[] serverList = {
 //            "localhost",
 //    };
     private static HashSet<String> commands = new HashSet<>(Arrays.asList(
-        "grep",
-        "exit",
-        "print",
-        "quit",
-        "log",
-        "put localfilename sdfsfilename",
-        "get sdfsfilename localfilename",
-        "ls sdsfilename",
-        "store",
-        "delete sdsfilename",
-        "get-versions sdfsfilename num-versions localfilename"
     ));
     private static String lastInput;
 
@@ -49,10 +102,6 @@ public class Client {
             }
         } else if (components.length == 3) {
             if (components[0].equals("put") || components[0].equals("get")) {
-                ret = cmd;
-            }
-        } else if (components.length == 4) {
-            if (components[0].equals("get-versions")) {
                 ret = cmd;
             }
         }
@@ -146,37 +195,11 @@ class queryThread extends Thread implements Runnable {
                     FileHandler.sendFile(components[1], socket, 0);
                     break;
                 case "get":
-                    if (in.readBoolean()) {
-                        sb.append("Received ACK for file!\n");
-                        synchronized(lock) {
-                            if (!read_quorum) {
-                                read_quorum = true;
-                                FileHandler.receiveFile(String.format("../%s", components[2]), socket);
-                                sb.append("Received file!\n");
-                            } else {
-                                sb.append("File already ACKED on another query thread\n");
-                                socket.close();
-                            }
-                        }
-                    }
                     synchronized (System.out) {
                         System.out.println(sb.toString());
                     }
                     return;
                 case "get-versions":
-                    if (in.readBoolean()) {
-                        sb.append("Received ACK for file!\n");
-                        synchronized(lock) {
-                            if (!read_quorum) {
-                                read_quorum = true;
-                                FileHandler.receiveFile("../" + components[3], socket);
-                                sb.append("Received file!\n");
-                            } else {
-                                sb.append("File already ACKED on another query thread\n");
-                                socket.close();
-                            }
-                        }
-                    }
                     synchronized (System.out) {
                         System.out.println(sb.toString());
                     }
