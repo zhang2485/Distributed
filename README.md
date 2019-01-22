@@ -1,4 +1,4 @@
-# CS425 MP3
+# Distributed File System
 
 Our MP implements the following algorithm for membership list and failure
 detection:

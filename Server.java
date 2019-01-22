@@ -1,213 +1,35 @@
 import java.io.*;
 import java.net.*;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.nio.file.Files;
 
-class FileHandler {
-    static final String DIRECTORY = "user.dir";
-    static final int BUFFER_SIZE  = 2048;
-    static final int MASTERPORT = 1234;
-    static File[] getFiles() {
-        File directory = new File(System.getProperty(DIRECTORY));
-        return directory.listFiles();
-    }
-
-    static void printFiles() {
         for (File f : getFiles())
             System.out.println(f.getName());
     }
 
-    static boolean fileExists(String filename) {
-        for (File f: getFiles()) {
-            if (f.getName().equals(filename)) return true;
-        }
-        return false;
-    }
-
-    static String getFilePath(String filename) {
-        return String.format("%s/%s", System.getProperty(DIRECTORY), filename);
-    }
-
-    static void sendFile(String filename, Socket socket) throws IOException {
-        // Instantiate streams
-        File file = new File(getFilePath(filename));
-        String container = Server.fileList.get(filename);
-        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        if(!file.exists() || !container.contains(Server.ip)) {
-        	String dne = "DNE";
-        	byte[] buff = dne.getBytes();
-        	out.write(buff, 0, buff.length);
-        	out.close();
-        	return;
-        }
-        FileInputStream in = new FileInputStream(file);
-        long numBytes = file.length();
-        out.writeLong(numBytes);
         // Send the file
         int count;
         byte[] buffer = new byte[BUFFER_SIZE];
         while ((count = in.read(buffer)) > 0) {
             out.write(buffer, 0, count);
         }
-        in.close();
-    }
-
-    static void sendFile(String filename, Socket socket, int v) throws IOException {
-        // Instantiate streams
-        File file = new File(getFilePath(filename));
-        String container = Server.fileList.get(filename);
-        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        if(!file.exists() || !container.contains(Server.ip)) {
-        	String dne = "DNE";
-        	byte[] buff = dne.getBytes();
-        	out.write(buff, 0, buff.length);
-        	out.close();
-        	return;
-        }
-        String content = new String(Files.readAllBytes(file.toPath()));
-        String [] versions = content.split("[|]");
-        System.out.println(versions.length);
-        int startIndex = versions.length - v;
-        StringBuilder sb = new StringBuilder();
-        while(startIndex < versions.length) {
-        	sb.append(versions[startIndex]);
-        	if(startIndex != versions.length - 1) {
-        		sb.append("|");
-        	}
-        	startIndex++;
-        }
-        String output = sb.toString();
-        long numBytes = output.length();
-        out.writeLong(numBytes);
-
-        // Send the file
-        byte[] buffer = output.getBytes();
-        int count = buffer.length;
-        out.write(buffer, 0, count);
-    }
-    
-    static void receiveFile(String filename, Socket socket) throws IOException {
-        // Instantiate streams
-    	File f = new File(getFilePath(filename));
-    	boolean exists = f.exists();
-        FileOutputStream out = new FileOutputStream(getFilePath(filename), exists);
-        DataInputStream in = new DataInputStream(socket.getInputStream());
-        Server.writeToLog("Instantiated Streams");
-        long numBytes = in.readLong();
-
-        // Receive and write to file
-        int count;
-        byte[] buffer = new byte[BUFFER_SIZE];
-        if(exists) {
-        	String delim = "|";
-        	byte [] b = delim.getBytes();
-        	out.write(b, 0, b.length);
-        }
-        while ((count = in.read(buffer)) > 0) {
-            out.write(buffer, 0, count);
-            numBytes -= count;
-            if (numBytes == 0)
-                break;
-        }
-        out.close();
-    }
-    
-    static void emptyPipe(String filename, Socket socket) throws IOException {
-        DataInputStream in = new DataInputStream(socket.getInputStream());
-        long numBytes = in.readLong();
-        int count;
-        byte[] buffer = new byte[BUFFER_SIZE];
-        while ((count = in.read(buffer)) > 0) {
-            numBytes -= count;
-            if (numBytes == 0)
-                break;
-        }
-    }
-    static void potentialFile(String filename, Socket socket) throws IOException {
-    	byte[] buf = new byte[2048];
-    	DatagramSocket sock = new DatagramSocket(MASTERPORT, InetAddress.getByName(Server.ip));
-        DatagramPacket packet = new DatagramPacket(buf, buf.length);
-        sock.setSoTimeout(0);
-        sock.receive(packet);
-        sock.close();
-        String selected = new String(buf);
-        System.out.println(selected);
-        Server.fileList.put(filename, selected);
-        System.out.println(Server.fileList);
-        if(selected.contains(Server.ip)) {
-        	receiveFile(filename, socket);
-        }
-        else {
-        	// Empty the pipe
-        	emptyPipe(filename, socket);
-        }
-    }
-}
-
-class signalThread extends MyThread implements Runnable {
-	
-	String ip;
-	public signalThread(String ip) {
-		this.ip = ip;
-	}
-    @Override
-    public void run() {
-    	System.out.println("Searching for lost files");
-    	System.out.println(Server.fileList);
-    	for(String k: Server.fileList.keySet()) {
-    		// Look for files lost with loss of group member, list of members that contain the file
-    		String list = Server.fileList.get(k);
-    		System.out.println(list);
-    		System.out.println(ip);
-    		if(list.contains(ip)) {
-    			List<String> temp = new ArrayList<String>(Server.group);
-    			int choice = (int) (Math.random() * (temp.size()));
-    			while(list.contains(Server.group.get(choice))) {
-    				choice = (int) (Math.random() * (temp.size()));
-    			}
-    			String [] str = list.split(",");
-    			for(int i = 0; i < str.length; i++) {
-    				if(str[i].equals(ip)) {
-    					str[i] = Server.group.get(choice);
-    				}
-    			}
-    			String newFileList = String.join("," , str);
-    			System.out.println(newFileList);
-    			for(String s: temp) {
-    				Socket sendList;
-					try {
-						sendList = new Socket(s, 2048);
-	    				DataOutputStream out = new DataOutputStream(sendList.getOutputStream());
-	    				out.writeBytes(k + ":" + newFileList);
-	    				System.out.println(k + ":" + newFileList);
-	    				sendList.close();
-					} catch (IOException e) {
-						
-					}
-
-    			}
-    		}
-    	}
-    	System.out.println("Finished Searching");
-    }
 }
 
 public class Server {
     static final String IP_DELIMITER = " ";
-//    private static final String INTRODUCER_IP = "192.168.1.14";
-    private static final String INTRODUCER_IP = "172.22.154.22";
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ss.SSS");
-    private static final int SERVER_PORT = 2017;
+    public static final int SERVER_PORT = 2217;
     volatile static String ip;
     volatile static ArrayList<String> group = new ArrayList<>();
-    private volatile static HashMap<String, String> connectTimes = new HashMap<>();
-    volatile static HashMap<String, String> fileList = new HashMap<>();
     private static ServerSocket serverSocket;
     static String machine;
     private static FileWriter log;
+    private static final boolean DEBUG = false;
 
     private static ArrayList<String> removeDuplicatesAndSort(ArrayList<String> list) {
         Set<String> set = new HashSet<>(list);
@@ -229,8 +51,8 @@ public class Server {
             Process proc = rt.exec(cmd);
             // Convert the command result into a String List
             return saveStream(proc.getInputStream());
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        } catch (Exception e) {
+            Server.writeToLog(e);
         }
         return res;
     }
@@ -247,6 +69,13 @@ public class Server {
         }
         // Return a list of String as running result
         return arr;
+    }
+
+    public static String getStackTrace(final Throwable throwable) {
+        final StringWriter sw = new StringWriter();
+        final PrintWriter pw = new PrintWriter(sw, true);
+        throwable.printStackTrace(pw);
+        return sw.getBuffer().toString();
     }
 
     static String readFile(String path, Charset encoding) throws IOException {
@@ -270,19 +99,12 @@ public class Server {
         return dateFormatter.format(new Date());
     }
 
-    static void writeToLog(String msg) throws IOException {
-        String date = getCurrentDateAsString();
-        String constructedLog = String.format("%s: %s\n", date, msg);
-        //System.out.print(constructedLog);
-        log.write(constructedLog);
-        log.flush();
     }
 
     static void addToMemberList(String ip) throws IOException {
         group.add(ip);
         group = removeDuplicatesAndSort(group);
         String date = getCurrentDateAsString();
-        connectTimes.put(ip, date);
         writeToLog(String.format("Added %s to member list", ip));
         logMemberList();
     }
@@ -312,11 +134,6 @@ public class Server {
     private static void updateMemberList(ArrayList<String> newList) throws IOException {
         writeToLog("Received update by membership list");
         group = removeDuplicatesAndSort(newList);
-        for (int i = 0; i < Server.group.size(); i++) {
-            String ip = Server.group.get(i);
-            String date = getCurrentDateAsString();
-            connectTimes.put(ip, date);
-        }
         logMemberList();
     }
 
@@ -358,7 +175,7 @@ public class Server {
             SocketHelper socket = new SocketHelper(SocketHelper.CONNECT_PORT);
             socket.send(ip, INTRODUCER_IP, SocketHelper.INTRODUCER_PORT);
             try {
-                DatagramPacket packet = socket.receive(MyThread.PROTOCOL_PERIOD);
+                DatagramPacket packet = socket.receive(FailureDetectionThread.PROTOCOL_PERIOD);
 
                 // We have successfully confirmed introducer is available
                 socket.close(); // Allow connect thread to open port at CONNECT_PORT
@@ -379,13 +196,198 @@ public class Server {
     public static void main(String args[]) throws IOException, InterruptedException {
         setupServer();
         serverSocket = new ServerSocket(SERVER_PORT);
+        System.out.println("Looking for new connection on server");
         while (true) {
             writeToLog("Looking for new connection on server");
             ServerResponseThread srt = new ServerResponseThread(serverSocket.accept());
             srt.run();
-            srt.join(); // Handle connections sequentially to achieve total ordering!
         }
     }
+}
+
+/*
+ * Worker thread processes the storm instructions
+ */
+class boltThread extends Thread {
+	int port = 6425;
+	String inst;
+	String [] bolts;
+	DataOutputStream writer;
+	public boltThread(String inst, DataOutputStream writer) {
+		System.out.println("BOLT THREAD");
+		inst = inst.replace("crane", "");
+		inst = inst.trim();
+		this.inst = inst.split("<>")[0];
+		bolts = this.inst.split(",");
+		this.writer = writer;
+	}
+	
+	public ArrayList<String> filter(String regex, ArrayList<String> lines){
+		for(int i = 0; i < lines.size(); i++) {
+			String line = lines.get(i);
+			if(!line.contains(regex)) {
+				lines.remove(i);
+				i = i - 1;
+			}
+		}
+		return lines;
+	}
+	
+	public ArrayList<String> transform(String regex, String replace, ArrayList<String> lines){
+		for(int i = 0; i < lines.size(); i++) {
+			String line = lines.get(i);
+			line = line.replace(regex,  replace);
+			lines.set(i, line);
+		}
+		return lines;
+	}
+	
+	public ArrayList<String> transform(String function, ArrayList<String> lines){
+		if(function.contains("upper")) {
+			for(int i = 0; i < lines.size(); i++) {
+				String line = lines.get(i);
+				line = line.toUpperCase();
+				lines.set(i, line);
+			}
+		}
+		else if(function.contains("lower")) {
+			for(int i = 0; i < lines.size(); i++) {
+				String line = lines.get(i);
+				line = line.toLowerCase();
+				lines.set(i, line);
+			}
+		}
+		return lines;
+	}
+	
+	public void run() {
+		try {
+			ServerSocket ss = new ServerSocket(port);
+			Socket s = ss.accept();
+			/*
+			 * Obtain list of tuples to process
+			 */
+			ArrayList<String> lines = new ArrayList<>();
+			BufferedReader br = new BufferedReader(new InputStreamReader(s.getInputStream()));
+			while(!br.ready()) {
+				// Wait for the file to perform bolts on
+			}
+			String line = null;
+			while((line = br.readLine())!=null) {
+				System.out.println(line);
+				lines.add(line + '\n');
+			}
+			/*
+			 * Every worker will perform all of the bolts in chained order
+			 * declared by user
+			 */
+			for(int i = 0; i < bolts.length; i++) {
+				String instruction = bolts[i];
+				System.out.println(instruction);
+				String [] parts = instruction.split(" ");
+				if(parts[0].contains("filter")) {
+					String regex = parts[1];
+					lines = filter(regex, lines);
+				}
+				else if(parts[0].contains("transform")) {
+					if(parts.length==2) {
+						//apply a string function
+						lines = transform(parts[1], lines);
+					}
+					else {
+						//transform from one substring to another
+						lines = transform(parts[1], parts[2], lines);
+					}
+				}
+			}
+			/*
+			 * Transform arrayList back into string after all bolts have finished 
+			 */
+			StringBuilder sb = new StringBuilder();
+			for(String l: lines) {
+				sb.append(l);
+			}
+			
+			/*
+			 * Return the finished string to the user
+			 */
+			writer.write(sb.toString().getBytes());
+			ss.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+}
+
+/*
+ * Spout thread splits the static database 
+ * file into even parts and evenly distributes the work
+ * among the worker nodes.
+ */
+class spoutThread extends Thread{
+	int port = 6425;
+	String inst;
+	String db;
+	/**
+	 *  Converts the chunks into strings before sending them 
+	 *  to worker threads for processing
+	 * @param lines
+	 * @return string
+	 */
+	public String convertToString(List<String> lines) {
+		StringBuilder sb = new StringBuilder();
+		for(String line: lines) {
+			sb.append(line + '\n');
+		}
+		return new String(sb);
+	}
+	/*
+	 * Spout thread opens up database from the instruction set
+	 */
+	public spoutThread(String inst) {
+		System.out.println("SPOUT THREAD");
+		this.inst = inst;
+		System.out.println(inst);
+		this.db = inst.split("<>")[1];
+	}
+	
+	public void run() {
+		try {
+			/*
+			 * partition database into even blocks, evenly split
+			 * between active worker nodes that are not spouts
+			 */
+			List<String> lines = Files.readAllLines(Paths.get(db), StandardCharsets.UTF_8);
+			String names = lines.remove(0);
+			int partitions = Server.group.size() - 1;
+			int partition = lines.size()/partitions;
+			List<List<String>> blocks = new LinkedList<List<String>>();
+			ArrayList<String> cpy = new ArrayList<>(Server.group);
+			// Remove spout ip from copy of group (only keep worker nodes)
+			cpy.remove(Server.ip.trim());
+			for (int i = 0; i < lines.size(); i += partition) {
+			    blocks.add(lines.subList(i, Math.min(i + partition, lines.size())));
+			}
+			/*
+			 * Send each worker node a copy of evenly divided stream
+			 * from static database
+			 */
+			for(int i = 0; i < cpy.size(); i++) {
+				Socket spout = new Socket(cpy.get(i), 6425);
+				DataOutputStream writer = new DataOutputStream(spout.getOutputStream());
+				String stream = convertToString(blocks.get(i));
+				writer.write(stream.getBytes());
+				spout.close();
+			}
+			
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+	
 }
 
 class ServerResponseThread extends Thread {
@@ -398,12 +400,38 @@ class ServerResponseThread extends Thread {
     @Override
     public void run() {
         try {
+        	System.out.println("GET COMMAND");
             DataInputStream reader = new DataInputStream(socket.getInputStream());
             DataOutputStream writer = new DataOutputStream(socket.getOutputStream());
             String cmd = reader.readUTF().trim();
             Server.writeToLog(String.format("Got command: %s", cmd));
+            cmd = cmd.trim();
             String[] cmds = cmd.split(" ");
             switch (cmds[0]) {
+            		/*
+            		 * crane:
+            		 * initializes spoutThread or boltThread to perform crane operations on 
+            		 * a database, returns row results to the client
+            		 */
+            		case "crane":
+            			//Remove crane from commands list
+            			cmds[0] = "";
+            			cmd = String.join(" ", cmds);
+            			cmd = cmd.trim();
+            			if(Server.ip.equals(Server.group.get(1))) {
+            				//Spout thread for assigning work to workers
+            				spoutThread sT = new spoutThread(cmd);
+            				sT.start();
+            				sT.join();
+            			}
+            			else {
+            				//Bolt thread to initiate workers.
+            				boltThread bT = new boltThread(cmd, writer);
+            				bT.start();
+            				bT.join();
+            			}
+            			break;
+           
                 /*
                  *  print:
                  *  This command prints out the current membership list on every available server
@@ -467,75 +495,113 @@ class ServerResponseThread extends Thread {
                  */
                 case "ls":
                     if (FileHandler.fileExists(cmds[1])) {
-                        writer.writeBytes("File found!");
+                        writer.writeBytes("+++++File found!");
                     } else {
-                        writer.writeBytes("File not found...");
+                        writer.writeBytes("-----not found");
                     }
                     Server.writeToLog(String.format("Checked for %s.", cmds[1]));
                     break;
                 /*
                 put:
-                receives a file from the client
+                receives a file from the client. Saves the file to a tmp file and then saves the file into the sdfs
+                if the master node sends a signal to save, otherwise we delete the tmp file and move on.
                  */
                 case "put":
-                    Server.writeToLog(String.format("Received put command: '%s'", cmd));
-                    // The Master node will be index 1 in the membership list
-                    // Simple in design effective in accomplishing the task
-                    System.out.println(Server.group);
-                    System.out.println(Server.ip);
-                    if(Server.fileList.containsKey(cmds[2])) {
-                    	String ips = Server.fileList.get(cmds[2]);
-                    	if(ips.contains(Server.ip)) {
-                    		FileHandler.receiveFile(cmds[2], socket);
-                    	}
-                    	else {
-                    		FileHandler.emptyPipe(cmds[2], socket);
-                    	}
-                    }else {
-	                    if(Server.group.get(Server.group.size() - 1).trim().equals(Server.ip.trim())) {
-	                    	List<String> temp = new ArrayList<String>(Server.group);
-	                    	Collections.shuffle(temp);
-	                    	temp = temp.subList(0, 3);
-	                    	String chosen = String.join(",", temp);
-	                        byte[] buf = chosen.getBytes();
-	                        DatagramSocket sock = new DatagramSocket();
-	                        for(int i = 0; i < Server.group.size(); i++) {
-		                        InetAddress IP = InetAddress.getByName(Server.group.get(i));
-		                        if(Server.group.get(i).equals(Server.ip.trim())) {
-		                        	continue;
-		                        }
-		                        DatagramPacket packet = new DatagramPacket(buf, buf.length, IP, 1234);
-		                        sock.send(packet);
-		                        Thread.sleep(600);
-	                        }
-	                        sock.close();
-	                        if(chosen.contains(Server.ip.trim())) {
-	                        	FileHandler.receiveFile(cmds[2], socket);
-	                        }
-	                        else {
-	                        	FileHandler.emptyPipe(cmds[2], socket);
-	                        }
-	                        Server.fileList.put(cmds[2], chosen);
-	                    }
-	                    else {
-	                    	FileHandler.potentialFile(cmds[2], socket);
-	                    }
+                    // Receive signal to save or not
+                    ReplicaReceiveThread receive = new ReplicaReceiveThread(socket, writer, cmds[2]);
+                    receive.start();
+                    Server.writeToLog("Started replica receive thread");
+
+                    // Master node needs to coordinate where files go by sending the save/delete signals
+                    Server.writeToLog(String.format("Master node is: %s and my ip is %s", FileHandler.getMasterNodeIP(), Server.ip));
+                    ReplicaMasterThread master = null;
+                    if (Server.ip.equals(FileHandler.getMasterNodeIP())) {
+                        Server.writeToLog("I am the master node!");
+                        master = new ReplicaMasterThread(cmds[2]);
+                        master.start();
+                        Server.writeToLog("Started replica master thread");
                     }
-                    writer.writeBytes("RECIEVED");
+
+                    try {
+                        if (master != null) {
+                            master.join();
+                            Server.writeToLog("Master thread successfully joined");
+                        }
+                        receive.join();
+                        Server.writeToLog("Replica threads finished");
+                    } catch (InterruptedException e) {
+                        Server.writeToLog(e);
+                    }
                     break;
                 /*
                 get:
                 sends a file to the client
                  */
                 case "get":
-	                Server.writeToLog(String.format("Received get command: '%s'", cmd));
-	                FileHandler.sendFile(cmds[1], socket, 1);
-	                Server.writeToLog(String.format("Sent file: %s", cmds[1]));
+
+                    try {
+                        if (FileHandler.fileExists(cmds[1])) {
+                            Server.writeToLog("get: File exists and i'm signalling that I have it");
+                            writer.writeBoolean(true);
+                            Server.writeToLog("get: signaled yes");
+                            int versions = FileHandler.numVersions(cmds[1]);
+                            Server.writeToLog("get: sending file");
+                            FileHandler.sendFile(cmds[1], socket, versions - 1);
+                            Server.writeToLog(String.format("get: sent file %s", cmds[1]));
+                        }
+                    } catch (FileNotFoundException e) {
+                        // If we could not find the file on our sdfs, then simply close socket to signal DNE
+                        Server.writeToLog(String.format("IOException: %s", e.getMessage()));
+                    }
                     break;
+                /*
+                get-versions:
+                get all versions of a file. Writes all versions to a temporary file and then sends that temp file
+                back to the client.
+                */
                 case "get-versions":
-	                Server.writeToLog(String.format("Received get command: '%s'", cmd));
-	                FileHandler.sendFile(cmds[1], socket, Integer.parseInt(cmds[2]));
-	                Server.writeToLog(String.format("Sent file: %s", cmds[1]));
+                    try {
+                        if (FileHandler.fileExists(cmds[1])) {
+                            Server.writeToLog("get-versions: File exists and i'm signalling that I have it");
+                            writer.writeBoolean(true);
+                            Server.writeToLog("get-versions: signaled yes");
+                            int numVersions = FileHandler.numVersions(cmds[1]);
+                            Server.writeToLog(String.format("get-versions numVersions: %d", numVersions));
+                            int numVersionsRequested = Integer.parseInt(cmds[2]);
+                            Server.writeToLog(String.format("get-versions numVersionsRequested: %d", numVersionsRequested));
+                            // Concatenate all versions into a tmp file
+                            Path tmpFile = Files.createTempFile(null, null);
+                            Server.writeToLog(String.format("get-versions tmpFile: %s", tmpFile.getFileName()));
+                            if (numVersions - numVersionsRequested > -1) {
+                                Server.writeToLog("get-versions: Concatenating versions to a temp file");
+                                FileOutputStream out = new FileOutputStream(tmpFile.toFile(), true);
+                                for (int i = numVersions - numVersionsRequested; i < numVersions; i++) {
+                                    File versionFile = FileHandler.getVersionContent(cmds[1], i);
+                                    FileHandler.appendFileToFile(versionFile, tmpFile.toFile());
+                                    out.write(FileHandler.DELIMITER.getBytes());
+                                    Server.writeToLog(String.format("get-versions appended version: %d", i));
+                                }
+                                Server.writeToLog(String.format("get-versions Sending concatenated versions: %s", tmpFile.getFileName()));
+                                FileHandler.sendFile(tmpFile.toFile(), socket);
+                            } else {
+                                Server.writeToLog("get-versions: Client requested too many versions");
+                            }
+                        }
+                    } catch (FileNotFoundException e) {
+                        Server.writeToLog(e);
+                    }
+                    break;
+                /*
+                get:
+                sends a file to the client
+                 */
+                case "delete":
+                    if (FileHandler.fileExists(cmds[1])) {
+                        FileHandler.deleteFile(cmds[1]);
+                        writer.writeBytes(String.format("Deleted %s", cmds[1]));
+                    } else {
+                        writer.writeBytes(String.format("File did not exist %s", cmds[1]));
+                    }
                     break;
                 default:
                     Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));
@@ -543,14 +609,185 @@ class ServerResponseThread extends Thread {
             }
             socket.close();
         } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+
+            Server.writeToLog(e);
         }
 
     }
 
 }
 
-class MyThread extends Thread {
+class FailureReplicaSendThread extends FailureDetectionThread {
+    final int TIMEOUT = 2000;
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                Server.writeToLog("Re-replicating files on my sdfs");
+                for (File file : FileHandler.getFiles()) {
+                    Server.writeToLog(String.format("Re-replicating: %s", file.getName()));
+                    for (int i = 0; i < Server.group.size(); i++) {
+                        if (FileHandler.isReplicaNode(file.getName(), i)) {
+                            Server.writeToLog(String.format("Re-replicating %s to %s", file.getName(), Server.group.get(i)));
+                            Socket socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
+                            socket.setSoTimeout(TIMEOUT);
+                            Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
+                            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                            DataInputStream in = new DataInputStream(socket.getInputStream());
+                            out.writeUTF(file.getName());
+                            boolean sendOrNot = in.readBoolean();
+                            if (sendOrNot) {
+                                Server.writeToLog(String.format("Sending %s to %s", file.getName(), Server.group.get(i)));
+                                int versions = FileHandler.numVersions(file.getName());
+                                FileHandler.sendFile(file, socket, versions - 1); // Send entire file
+                                Server.writeToLog("Sent re-replication file");
+                            } else {
+                                Server.writeToLog("Did not send re-replication file");
+                            }
+                        }
+                    }
+                }
+                systemClockSleep(1500);
+            } catch (IOException e) {
+                Server.writeToLog(e);
+            }
+        }
+    }
+}
+
+class FailureReplicaCleanupThread extends Thread {
+
+    public FailureReplicaCleanupThread() {
+        Server.writeToLog("Instantiated FailureReplicaCleanupThread");
+    }
+
+    @Override
+    public void run() {
+        while(true) {
+            try {
+                int myIndex = Server.group.indexOf(Server.ip);
+                if (myIndex != -1) {
+                    for (File file : FileHandler.getFiles()) {
+                        if (!FileHandler.isReplicaNode(file.getName(), myIndex)) {
+                            Server.writeToLog(String.format("Deleting-file: %s", file.getName()));
+                            Server.writeToLog(String.format("Deleting-hashcode: %s", file.getName().hashCode()));
+                            Server.writeToLog(String.format("Deleting-file-node: %d", FileHandler.getNodeFromFile(file.getName())));
+                            Server.writeToLog(String.format("Deleting-group: %s", Server.group.toString()));
+                            Server.writeToLog(String.format("Deleting-myIndex: %d", myIndex));
+                            Server.writeToLog(String.format("Deleting-Server.ip: %s", Server.ip));
+                            FileHandler.deleteFile(file.getName());
+                        }
+                    }
+                }
+                Thread.sleep(500);
+            } catch (IOException | InterruptedException e) {
+                Server.writeToLog(e.getMessage());
+            }
+        }
+    }
+}
+
+class FailureReplicaReceiveThread extends Thread {
+    ServerSocket serverSocket;
+    final int TIMEOUT = 2000;
+
+    public FailureReplicaReceiveThread() {
+        try {
+            serverSocket = new ServerSocket(FileHandler.FAILURE_REPLICA_PORT);
+            Server.writeToLog("Instantiated failure replica receive server socket");
+        } catch (IOException e) {
+            Server.writeToLog(e);
+        }
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                Socket socket = serverSocket.accept();
+                socket.setSoTimeout(TIMEOUT);
+                Server.writeToLog(String.format("Got connection for re-replication from %s", socket.getRemoteSocketAddress().toString()));
+                DataInputStream in = new DataInputStream(socket.getInputStream());
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                String filename = in.readUTF().trim();
+                Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
+                if (!FileHandler.fileExists(filename)) {
+                    Server.writeToLog("File does not exist for me, accepting re-replication file");
+                    out.writeBoolean(true);
+                    FileHandler.receiveFile(filename, socket);
+                    Server.writeToLog(String.format("Saved re-replication file: %s", filename));
+                } else {
+                    out.writeBoolean(false);
+                    Server.writeToLog(String.format("Re-replication file already exists: %s", filename));
+                }
+            } catch (IOException e) {
+                Server.writeToLog(e);
+            }
+        }
+    }
+
+}
+
+class ReplicaReceiveThread extends Thread {
+    Socket socket;
+    String filename;
+    DataOutputStream writer;
+
+    public ReplicaReceiveThread(Socket socket, DataOutputStream writer, String filename) {
+        this.socket = socket;
+        this.writer = writer;
+        this.filename = filename;
+    }
+
+    @Override
+    public void run() {
+        try {
+            if (FileHandler.receiveReplicaSignal()) {
+                // Signaled to save
+                Server.writeToLog("Received replica signal to save");
+                FileHandler.receiveFile(filename, socket);
+                Server.writeToLog(String.format("Saved file: %s", filename));
+                writer.writeBytes("File saved ACK");
+            } else {
+                Server.writeToLog("Received replica signal to not save");
+            }
+        } catch (IOException e) {
+            Server.writeToLog(e);
+
+        }
+    }
+}
+
+class ReplicaMasterThread extends Thread {
+    String filename;
+
+    public ReplicaMasterThread(String filename) {
+        this.filename = filename;
+    }
+
+    @Override
+    public void run() {
+        try {
+            // Give the signal to either save or delete the temporary file
+            for (int i = 0; i < Server.group.size(); i++) {
+                boolean signal = FileHandler.isReplicaNode(filename, i);
+                Server.writeToLog(String.format("Master-thread-filename: %s", filename));
+                Server.writeToLog(String.format("Master-thread-signal: %b", signal));
+                Server.writeToLog(String.format("Master-thread-hashcode: %s", filename.hashCode()));
+                Server.writeToLog(String.format("Master-thread-file-node: %d", FileHandler.getNodeFromFile(filename)));
+                Server.writeToLog(String.format("Master-thread-group: %s", Server.group.toString()));
+                Server.writeToLog(String.format("Master-thread-i: %d", i));
+                Server.writeToLog(String.format("Master-thread-Server.ip: %s", Server.group.get(i)));
+                FileHandler.sendReplicaSignal(Server.group.get(i), signal);
+                Server.writeToLog(String.format("Sent replica signal to %s", Server.group.get(i)));
+            }
+        } catch (IOException e) {
+            Server.writeToLog(e.getMessage());
+        }
+    }
+}
+
+class FailureDetectionThread extends Thread {
     public static final int[] neighbors = {-2, -1, 1, 2};
     static final int PROTOCOL_PERIOD = 400;
     static final int FAIL_TIME = 1000;
@@ -584,7 +821,7 @@ class MyThread extends Thread {
 
 }
 
-class AckThread extends MyThread implements Runnable {
+class AckThread extends FailureDetectionThread implements Runnable {
     @Override
     public void run() {
         try {
@@ -600,12 +837,12 @@ class AckThread extends MyThread implements Runnable {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 }
 
-class PingThread extends MyThread implements Runnable {
+class PingThread extends FailureDetectionThread implements Runnable {
     private int i = 0;
     public void replicateFiles(String failed) {
     	for(int j = 0; j < Server.fileList.size(); j++) {
@@ -648,12 +885,12 @@ class PingThread extends MyThread implements Runnable {
                 systemClockSleep(PROTOCOL_PERIOD);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 }
 
-class IntroducerThread extends MyThread implements Runnable {
+class IntroducerThread extends FailureDetectionThread implements Runnable {
     @Override
     public void run() {
         try {
@@ -669,12 +906,12 @@ class IntroducerThread extends MyThread implements Runnable {
                 disseminate();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 }
 
-class ConnectThread extends MyThread implements Runnable {
+class ConnectThread extends FailureDetectionThread implements Runnable {
     @Override
     public void run() {
         try {
@@ -685,7 +922,7 @@ class ConnectThread extends MyThread implements Runnable {
                 Server.updateMemberList(newList.split(Server.IP_DELIMITER));
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Server.writeToLog(e);
         }
     }
 }
@@ -746,10 +983,11 @@ class fileThread extends MyThread implements Runnable {
  * Contains a helper functions for UDP programming
  */
 class SocketHelper {
-    static final int CONNECT_PORT = 2020;
-    static final int INTRODUCER_PORT = 2013;
-    static final int PING_PORT = 2010;
-    static final int ACK_PORT = 2011;
+
+    static final int CONNECT_PORT = 14120;
+    static final int INTRODUCER_PORT = 14112;
+    static final int PING_PORT = 14110;
+    static final int ACK_PORT = 14111;
     Random random = new Random();
 
     private final int BUFFER_SIZE = 4096;
@@ -786,6 +1024,4 @@ class SocketHelper {
     void close() {
         socket.close();
     }
-
 }
-

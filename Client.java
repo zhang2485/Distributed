@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.*;
 
 class clientFileHandler {
@@ -79,37 +80,15 @@ class clientFileHandler {
 
 public class Client {
 
-    private static final int SERVER_PORT = 2017;
-    static final String[] serverList = {
-            "fa18-cs425-g07-01.cs.illinois.edu",
-            "fa18-cs425-g07-02.cs.illinois.edu",
-            "fa18-cs425-g07-03.cs.illinois.edu",
-            "fa18-cs425-g07-04.cs.illinois.edu",
-            "fa18-cs425-g07-05.cs.illinois.edu",
-            "fa18-cs425-g07-06.cs.illinois.edu",
-            "fa18-cs425-g07-07.cs.illinois.edu",
-            "fa18-cs425-g07-08.cs.illinois.edu",
-            "fa18-cs425-g07-09.cs.illinois.edu",
-            "fa18-cs425-g07-10.cs.illinois.edu"
     };
 //    static final String[] serverList = {
 //            "localhost",
 //    };
     private static HashSet<String> commands = new HashSet<>(Arrays.asList(
-            "grep",
-            "exit",
-            "print",
-            "quit",
-            "log",
-            "put localfilename sdfsfilename",
-            "get sdfsfilename localfilename",
-            "ls sdsfilename",
-            "store",
-            "delete sdsfilename",
-            "get-versions sdfsfilename numversions localfilename"
     ));
     private static String lastInput;
 
+    // Checks the input string against our dictionary of existing commands
     public static String checkCommand(String cmd) {
         String ret = "INVALID";
         String[] components = cmd.split(" ");
@@ -123,19 +102,8 @@ public class Client {
             }
         } else if (components.length == 3) {
             if (components[0].equals("put") || components[0].equals("get")) {
-                if (components[0].equals("put")) {
-                    if (!FileHandler.fileExists(components[1])) {
-                        System.out.print("File does not exist!\n");
-                        return ret;
-                    }
-                }
                 ret = cmd;
             }
-
-        } else if(components.length == 4) {
-        	if(components[0].equals("get-versions") && components[2].matches("-?\\d+")) {
-        		ret = cmd;
-        	}
         }
         return ret;
     }
@@ -147,6 +115,7 @@ public class Client {
             System.exit(0);
         }
         System.out.printf("================= %s =================\n", cmd);
+        long startTime = System.currentTimeMillis();
         if (!commands.contains(cmds[0]) && checkCommand(cmd).equals("INVALID")) {
             System.out.printf("Type a valid command from %s%n", commands.toString());
             return;
@@ -155,15 +124,17 @@ public class Client {
             FileHandler.printFiles();
         } else {
             ArrayList<queryThread> threads = new ArrayList<>();
+            queryThread.read_quorum = false;
             for (String server : serverList) {
-                queryThread thread = new queryThread(server, SERVER_PORT, cmd);
+                queryThread thread = new queryThread(server, Server.SERVER_PORT, cmd);
                 thread.start();
                 threads.add(thread);
             }
             for (queryThread thread : threads)
                 thread.join();
         }
-        System.out.printf("================= %s =================\n", cmd);
+        long endTime = System.currentTimeMillis();
+        System.out.printf("================= %s %dms =================\n", cmd, endTime - startTime);
         lastInput = new String(cmd);
     }
 
@@ -195,6 +166,8 @@ class queryThread extends Thread implements Runnable {
     private BufferedReader reader;
     private DataOutputStream writer;
     private String cmd;
+    static private final Object lock = new Object();
+    static boolean read_quorum;
 
     public queryThread(String ip, int port, String cmd) throws IOException {
         this.cmd = String.format("%s\n", cmd);
@@ -205,11 +178,12 @@ class queryThread extends Thread implements Runnable {
 
     @Override
     public void run() {
+        StringBuilder sb = new StringBuilder();
         try {
             socket = new Socket(ip, port);
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             writer = new DataOutputStream(socket.getOutputStream());
-            StringBuilder sb = new StringBuilder();
             sb.append(String.format("%s\n", ip));
 
             // Send command to server
@@ -218,18 +192,14 @@ class queryThread extends Thread implements Runnable {
             // Handle extra logic needed by commands
             switch (components[0]) {
                 case "put":
-                    FileHandler.sendFile(components[1], socket);
+                    FileHandler.sendFile(components[1], socket, 0);
                     break;
                 case "get":
-                    clientFileHandler.receiveFile(components[2], socket);
-                    sb.append("Received file!\n");
                     synchronized (System.out) {
                         System.out.println(sb.toString());
                     }
                     return;
                 case "get-versions":
-                    clientFileHandler.receiveFile(components[3], socket);
-                    sb.append("Received file!\n");
                     synchronized (System.out) {
                         System.out.println(sb.toString());
                     }
@@ -244,12 +214,25 @@ class queryThread extends Thread implements Runnable {
             while ((line = reader.readLine()) != null)
                 sb.append(String.format("%s\n", line));
 
-            synchronized (System.out) {
-                System.out.println(sb.toString());
+            socket.close();
+        } catch (EOFException e) {
+            sb.append("Server closed socket signalling DNE\n");
+        } catch (SocketException e) {
+            switch (components[0]) {
+                case "put":
+                    sb.append("This node does not hold the replica\n");
+                    break;
+                default:
+                    sb.append(String.format("Could not connect to %s\n", ip));
+                    break;
             }
-
         } catch (IOException e) {
-            System.out.printf("Could not query to %s due to %s\n", ip, e.getMessage());
+            System.out.printf("Could not query %s due to ", ip);
+            e.printStackTrace();
         }
+        synchronized (System.out) {
+            System.out.println(sb.toString());
+        }
+
     }
 }
