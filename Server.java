@@ -1,4 +1,5 @@
 import java.io.*;
+import java.lang.reflect.InvocationTargetException;
 import java.net.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -8,28 +9,26 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.nio.file.Files;
 
-        for (File f : getFiles())
-            System.out.println(f.getName());
-    }
-
-        // Send the file
-        int count;
-        byte[] buffer = new byte[BUFFER_SIZE];
-        while ((count = in.read(buffer)) > 0) {
-            out.write(buffer, 0, count);
-        }
-}
+import static java.lang.Math.abs;
 
 public class Server {
     static final String IP_DELIMITER = " ";
+    private static final String INTRODUCER_IP = "172.22.156.255";
+
+    /* FOR DEBUGGING */
+    // private static final String INTRODUCER_IP = "192.168.1.12";
+    // private static final String INTRODUCER_IP = "10.195.57.170";
+    // private static final String INTRODUCER_IP = "172.31.98.6";
+
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ss.SSS");
-    public static final int SERVER_PORT = 2217;
+    public static final int SERVER_PORT = 65004;
     volatile static String ip;
     volatile static ArrayList<String> group = new ArrayList<>();
     private static ServerSocket serverSocket;
     static String machine;
     private static FileWriter log;
-    private static final boolean DEBUG = false;
+    public static FileWriter craneLog;
+    private static final boolean DEBUG = true;
 
     private static ArrayList<String> removeDuplicatesAndSort(ArrayList<String> list) {
         Set<String> set = new HashSet<>(list);
@@ -46,7 +45,7 @@ public class Server {
             // run Linux command line in java program
             Runtime rt = Runtime.getRuntime();
             // Set the actual command based on feeding pattern
-            String[] cmd = {"/bin/sh", "-c", String.format("grep %s %s", pattern, logFileName).trim()};
+            String[] cmd = { "/bin/sh", "-c", String.format("grep %s %s", pattern, logFileName).trim() };
             // Run command line
             Process proc = rt.exec(cmd);
             // Convert the command result into a String List
@@ -58,7 +57,8 @@ public class Server {
     }
 
     private static ArrayList<String> saveStream(InputStream in) throws IOException {
-        // Create a new bufferedReader using inputStream based on running result of the command line
+        // Create a new bufferedReader using inputStream based on running result of the
+        // command line
         BufferedReader is = new BufferedReader(new InputStreamReader(in));
         ArrayList<String> arr = new ArrayList<>();
         String line;
@@ -95,10 +95,34 @@ public class Server {
         return String.format("%s.log", machine);
     }
 
+    static String getCraneLogFileName() {
+        return String.format("%s.crane", machine);
+    }
+
     public static String getCurrentDateAsString() {
         return dateFormatter.format(new Date());
     }
 
+    static void writeToLog(final Throwable throwable) {
+        writeToLog(getStackTrace(throwable));
+    }
+
+    static String getCraneSpout() {
+        return Server.group.get(0);
+    }
+
+    static void writeToLog(String msg) {
+        try {
+            if (DEBUG) {
+                String date = getCurrentDateAsString();
+                String constructedLog = String.format("%s: %s\n", date, msg);
+                System.out.print(constructedLog);
+                log.write(constructedLog);
+                log.flush();
+            }
+        } catch (IOException e) {
+            Server.writeToLog(e);
+        }
     }
 
     static void addToMemberList(String ip) throws IOException {
@@ -108,21 +132,14 @@ public class Server {
         writeToLog(String.format("Added %s to member list", ip));
         logMemberList();
     }
-    
-    
+
     static void removeFromMemberList(String ip) throws IOException {
-    	ip = ip.trim();
-    	System.out.println("REMOVED NODE " + ip);
         int found = Server.group.indexOf(ip);
         if (found != -1) {
             Server.group.remove(found);
             writeToLog(String.format("Removed %s from member list", ip));
         } else {
             writeToLog(String.format("Requested removal of members list for %s but it wasn't there", ip));
-        }
-        // This will alert other nodes of need for replication (213) Master Node is last member of List
-        if(Server.group.get(Server.group.size() - 1).equals(Server.ip)) {
-        	new signalThread(ip).start();
         }
         logMemberList();
     }
@@ -149,9 +166,18 @@ public class Server {
         // Must collect metadata about computer before creating log file
         machine = getCanonicalName();
         ip = getIPAddress();
-        // FileWriter object contains instance to log file for server
+        // FileWriter object contains topology to log file for server
         log = new FileWriter(new File(getLogFileName()));
+        craneLog = new FileWriter(new File(getCraneLogFileName()));
         writeToLog(String.format("Attempting to start server at: %s", ip));
+
+        // Setup CraneApp actions
+        Crane.setup();
+
+        // Start SDFS replicas threads
+        // new FailureReplicaReceiveThread().start();
+        // new FailureReplicaCleanupThread().start();
+        // new FailureReplicaSendThread().start();
 
         if (ip.equals(INTRODUCER_IP)) {
             // If I am the introducer machine
@@ -160,17 +186,14 @@ public class Server {
             new IntroducerThread().start();
             new ConnectThread().start();
             new PingThread().start();
-            new fileThread().start();
         } else {
             /*
-             *  The following section checks if the introducer machine is alive by pinging it,
-             *  waiting for its response, and then taking the respective action. The ping holds the ip address
-             *  of the machine that is pinging so that the introducer can disseminate the ip.
+             * The following section checks if the introducer machine is alive by pinging
+             * it, waiting for its response, and then taking the respective action. The ping
+             * holds the ip address of the machine that is pinging so that the introducer
+             * can disseminate the ip.
              *
-             *  If the introducer machine is available:
-             *      start a new server
-             *  else
-             *      exit
+             * If the introducer machine is available: start a new server else exit
              */
             SocketHelper socket = new SocketHelper(SocketHelper.CONNECT_PORT);
             socket.send(ip, INTRODUCER_IP, SocketHelper.INTRODUCER_PORT);
@@ -184,9 +207,8 @@ public class Server {
                 new AckThread().start();
                 new ConnectThread().start();
                 new PingThread().start();
-                new fileThread().start();
             } catch (SocketTimeoutException e) {
-                //Introducer is inactive
+                // Introducer is inactive
                 writeToLog("Introducer is inactive");
                 System.exit(0);
             }
@@ -196,7 +218,7 @@ public class Server {
     public static void main(String args[]) throws IOException, InterruptedException {
         setupServer();
         serverSocket = new ServerSocket(SERVER_PORT);
-        System.out.println("Looking for new connection on server");
+        Server.writeToLog("Looking for new connection on server");
         while (true) {
             writeToLog("Looking for new connection on server");
             ServerResponseThread srt = new ServerResponseThread(serverSocket.accept());
@@ -206,188 +228,130 @@ public class Server {
 }
 
 /*
- * Worker thread processes the storm instructions
+ * Worker thread processes the storm topology
  */
-class boltThread extends Thread {
-	int port = 6425;
-	String inst;
-	String [] bolts;
-	DataOutputStream writer;
-	public boltThread(String inst, DataOutputStream writer) {
-		System.out.println("BOLT THREAD");
-		inst = inst.replace("crane", "");
-		inst = inst.trim();
-		this.inst = inst.split("<>")[0];
-		bolts = this.inst.split(",");
-		this.writer = writer;
-	}
-	
-	public ArrayList<String> filter(String regex, ArrayList<String> lines){
-		for(int i = 0; i < lines.size(); i++) {
-			String line = lines.get(i);
-			if(!line.contains(regex)) {
-				lines.remove(i);
-				i = i - 1;
-			}
-		}
-		return lines;
-	}
-	
-	public ArrayList<String> transform(String regex, String replace, ArrayList<String> lines){
-		for(int i = 0; i < lines.size(); i++) {
-			String line = lines.get(i);
-			line = line.replace(regex,  replace);
-			lines.set(i, line);
-		}
-		return lines;
-	}
-	
-	public ArrayList<String> transform(String function, ArrayList<String> lines){
-		if(function.contains("upper")) {
-			for(int i = 0; i < lines.size(); i++) {
-				String line = lines.get(i);
-				line = line.toUpperCase();
-				lines.set(i, line);
-			}
-		}
-		else if(function.contains("lower")) {
-			for(int i = 0; i < lines.size(); i++) {
-				String line = lines.get(i);
-				line = line.toLowerCase();
-				lines.set(i, line);
-			}
-		}
-		return lines;
-	}
-	
-	public void run() {
-		try {
-			ServerSocket ss = new ServerSocket(port);
-			Socket s = ss.accept();
-			/*
-			 * Obtain list of tuples to process
-			 */
-			ArrayList<String> lines = new ArrayList<>();
-			BufferedReader br = new BufferedReader(new InputStreamReader(s.getInputStream()));
-			while(!br.ready()) {
-				// Wait for the file to perform bolts on
-			}
-			String line = null;
-			while((line = br.readLine())!=null) {
-				System.out.println(line);
-				lines.add(line + '\n');
-			}
-			/*
-			 * Every worker will perform all of the bolts in chained order
-			 * declared by user
-			 */
-			for(int i = 0; i < bolts.length; i++) {
-				String instruction = bolts[i];
-				System.out.println(instruction);
-				String [] parts = instruction.split(" ");
-				if(parts[0].contains("filter")) {
-					String regex = parts[1];
-					lines = filter(regex, lines);
-				}
-				else if(parts[0].contains("transform")) {
-					if(parts.length==2) {
-						//apply a string function
-						lines = transform(parts[1], lines);
-					}
-					else {
-						//transform from one substring to another
-						lines = transform(parts[1], parts[2], lines);
-					}
-				}
-			}
-			/*
-			 * Transform arrayList back into string after all bolts have finished 
-			 */
-			StringBuilder sb = new StringBuilder();
-			for(String l: lines) {
-				sb.append(l);
-			}
-			
-			/*
-			 * Return the finished string to the user
-			 */
-			writer.write(sb.toString().getBytes());
-			ss.close();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
+class BoltThread extends Thread {
+    String[] topology;
+    DataOutputStream writer;
+
+    public BoltThread(String topology, DataOutputStream writer) {
+        Server.writeToLog("BOLT THREAD");
+        this.topology = topology.split(Crane.FILE_DELIMITER)[0].split(" ");
+        this.writer = writer;
+    }
+
+    public void run() {
+        try {
+            // Keep trying to connect to spout
+            while (true) {
+                try {
+                    Socket s = new Socket(Server.getCraneSpout(), Crane.CRANE_PORT);
+                    /*
+                     * Obtain list of tuples to process
+                     */
+                    BufferedReader br = new BufferedReader(new InputStreamReader(s.getInputStream()));
+                    while (!br.ready()) {
+                        // Wait for the file to perform topology on
+                    }
+
+                    long start = System.currentTimeMillis();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        // Perform topology
+                        String action;
+                        for (int i = 0; i < topology.length; i++) {
+                            action = topology[i];
+                            line = (String) CraneApp.actions.get(action).invoke(null, line);
+                        }
+                        if (!line.equals("")) {
+                            String lineWithNewline = line + '\n';
+                            Server.craneLog.write(lineWithNewline);
+                            writer.writeBytes(lineWithNewline);
+                        }
+                    }
+                    Server.craneLog.flush();
+                    writer.flush();
+                    long end = System.currentTimeMillis();
+                    long timeElapsed = end - start;
+                    Server.writeToLog(String.format("bolt time elapsed: %d", timeElapsed));
+                    s.close();
+                    return;
+                } catch (ConnectException e) {
+                    Server.writeToLog("Connect failed, waiting and trying again");
+                    try {
+                        Thread.sleep(500); // 0.5 seconds
+                    } catch (InterruptedException ie) {
+                        Server.writeToLog(ie);
+                    }
+                }
+            }
+        } catch (Error | Exception e) {
+            Server.writeToLog(e);
+        }
+    }
 }
 
 /*
- * Spout thread splits the static database 
- * file into even parts and evenly distributes the work
- * among the worker nodes.
+ * Spout thread splits the static database file into even parts and evenly
+ * distributes the work among the worker nodes.
  */
-class spoutThread extends Thread{
-	int port = 6425;
-	String inst;
-	String db;
-	/**
-	 *  Converts the chunks into strings before sending them 
-	 *  to worker threads for processing
-	 * @param lines
-	 * @return string
-	 */
-	public String convertToString(List<String> lines) {
-		StringBuilder sb = new StringBuilder();
-		for(String line: lines) {
-			sb.append(line + '\n');
-		}
-		return new String(sb);
-	}
-	/*
-	 * Spout thread opens up database from the instruction set
-	 */
-	public spoutThread(String inst) {
-		System.out.println("SPOUT THREAD");
-		this.inst = inst;
-		System.out.println(inst);
-		this.db = inst.split("<>")[1];
-	}
-	
-	public void run() {
-		try {
-			/*
-			 * partition database into even blocks, evenly split
-			 * between active worker nodes that are not spouts
-			 */
-			List<String> lines = Files.readAllLines(Paths.get(db), StandardCharsets.UTF_8);
-			String names = lines.remove(0);
-			int partitions = Server.group.size() - 1;
-			int partition = lines.size()/partitions;
-			List<List<String>> blocks = new LinkedList<List<String>>();
-			ArrayList<String> cpy = new ArrayList<>(Server.group);
-			// Remove spout ip from copy of group (only keep worker nodes)
-			cpy.remove(Server.ip.trim());
-			for (int i = 0; i < lines.size(); i += partition) {
-			    blocks.add(lines.subList(i, Math.min(i + partition, lines.size())));
-			}
-			/*
-			 * Send each worker node a copy of evenly divided stream
-			 * from static database
-			 */
-			for(int i = 0; i < cpy.size(); i++) {
-				Socket spout = new Socket(cpy.get(i), 6425);
-				DataOutputStream writer = new DataOutputStream(spout.getOutputStream());
-				String stream = convertToString(blocks.get(i));
-				writer.write(stream.getBytes());
-				spout.close();
-			}
-			
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+class SpoutThread extends Thread {
+    String db;
 
-	}
-	
+    /*
+     * Spout thread opens up database from the topology set
+     */
+    public SpoutThread(String topology) {
+        Server.writeToLog("SPOUT THREAD");
+        this.db = topology.split(Crane.FILE_DELIMITER)[1];
+    }
+
+    public void run() {
+        try {
+            // Wait for connections
+            ServerSocket ss = new ServerSocket(Crane.CRANE_PORT);
+            int numBolts = 0;
+            ArrayList<Socket> sockets = new ArrayList<>();
+            ArrayList<DataOutputStream> writers = new ArrayList<>();
+            while (numBolts++ < Server.group.size() - 1) {
+                Socket socket = ss.accept();
+                sockets.add(socket);
+                writers.add(new DataOutputStream(new BufferedOutputStream(socket.getOutputStream())));
+            }
+
+            // Instantiate stream and constants
+            BufferedReader stream = Files.newBufferedReader(Paths.get(db));
+
+            // Round robin send the lines to the bolts
+            int currentIndex = 0;
+            String line;
+            long start = System.currentTimeMillis();
+            long timeElapsed;
+            while ((line = stream.readLine()) != null) {
+                try {
+                    writers.get((currentIndex = (currentIndex + 1) % writers.size())).writeBytes(line + "\n");
+                } catch (SocketException e) {
+                    writers.remove(currentIndex);
+                    writers.get((currentIndex = (currentIndex + 1) % writers.size())).writeBytes(line + "\n");
+                }
+            }
+            long end = System.currentTimeMillis();
+            timeElapsed = end - start;
+            Server.writeToLog(String.format("sprout time elapsed: %d", timeElapsed));
+            // Flush all data
+            for (DataOutputStream writer : writers)
+                writer.flush();
+            // Close all the sockets
+            for (Socket socket : sockets)
+                socket.close();
+            ss.close();
+
+        } catch (Error | Exception e) {
+            Server.writeToLog(e);
+        }
+
+    }
+
 }
 
 class ServerResponseThread extends Thread {
@@ -400,225 +364,218 @@ class ServerResponseThread extends Thread {
     @Override
     public void run() {
         try {
-        	System.out.println("GET COMMAND");
             DataInputStream reader = new DataInputStream(socket.getInputStream());
-            DataOutputStream writer = new DataOutputStream(socket.getOutputStream());
+            DataOutputStream writer = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
             String cmd = reader.readUTF().trim();
             Server.writeToLog(String.format("Got command: %s", cmd));
             cmd = cmd.trim();
             String[] cmds = cmd.split(" ");
             switch (cmds[0]) {
-            		/*
-            		 * crane:
-            		 * initializes spoutThread or boltThread to perform crane operations on 
-            		 * a database, returns row results to the client
-            		 */
-            		case "crane":
-            			//Remove crane from commands list
-            			cmds[0] = "";
-            			cmd = String.join(" ", cmds);
-            			cmd = cmd.trim();
-            			if(Server.ip.equals(Server.group.get(1))) {
-            				//Spout thread for assigning work to workers
-            				spoutThread sT = new spoutThread(cmd);
-            				sT.start();
-            				sT.join();
-            			}
-            			else {
-            				//Bolt thread to initiate workers.
-            				boltThread bT = new boltThread(cmd, writer);
-            				bT.start();
-            				bT.join();
-            			}
-            			break;
-           
-                /*
-                 *  print:
-                 *  This command prints out the current membership list on every available server
-                 */
-                case "print":
-                    writer.writeBytes(String.format("My ID is: %s\n", Server.ip));
-                    writer.writeBytes(String.format("%d members are in my group\n", Server.group.size()));
-                    for (String server : Server.group)
-                        writer.writeBytes(String.format("%s\n", server));
-                    Server.writeToLog("Sent membership list to client");
-                    break;
-                /*
-                 *  grep:
-                 *  execute a grep command on the log file and send back the grep results
-                 */
-                case "grep":
-                    if (cmds.length < 2) {
-                        Server.writeToLog("grep command did not have the right arguments");
-                        return;
+            /*
+             * crane: initializes spoutThread or boltThread to perform crane operations on a
+             * database, returns row results to the client
+             */
+            case "crane":
+                // Remove crane from commands list
+                cmds[0] = "";
+                cmd = String.join(" ", cmds);
+                cmd = cmd.trim();
+                if (Server.ip.equals(Server.group.get(0))) {
+                    // Spout thread for assigning work to workers
+                    SpoutThread sT = new SpoutThread(cmd);
+                    sT.start();
+                    sT.join();
+                } else {
+                    // Bolt thread to initiate workers.
+                    BoltThread bT = new BoltThread(cmd, writer);
+                    bT.start();
+                    bT.join();
+                }
+                break;
+
+            /*
+             * print: This command prints out the current membership list on every available
+             * server
+             */
+            case "print":
+                writer.writeBytes(String.format("My ID is: %s\n", Server.ip));
+                writer.writeBytes(String.format("%d members are in my group\n", Server.group.size()));
+                for (String server : Server.group)
+                    writer.writeBytes(String.format("%s\n", server));
+                Server.writeToLog("Sent membership list to client");
+                break;
+            /*
+             * grep: execute a grep command on the log file and send back the grep results
+             */
+            case "grep":
+                if (cmds.length < 2) {
+                    Server.writeToLog("grep command did not have the right arguments");
+                    return;
+                }
+                // Extract pattern
+                int patternStart = cmd.indexOf(" ");
+                ArrayList<String> res = Server.logGrep(cmd.substring(patternStart + 1), Server.getLogFileName());
+                writer.writeBytes(String.join("\n", res));
+                Server.writeToLog("Sent grep output to client");
+                break;
+            /*
+             * quit: exits if I was commanded to quit, else update my membership list
+             */
+            case "quit":
+                if (cmds.length < 2) {
+                    Server.writeToLog("quit command did not have the right arguments");
+                    return;
+                }
+                String quitter = cmds[1];
+                if (Server.ip.equals(quitter)) {
+                    System.exit(0);
+                } else {
+                    Server.removeFromMemberList(quitter);
+                }
+                Server.writeToLog(String.format("%s naturally exited.", quitter));
+                break;
+            /*
+             * log: sends back the log of a specific ip address
+             */
+            case "log":
+                if (cmds.length < 2) {
+                    Server.writeToLog("log command did not have the right arguments");
+                    return;
+                }
+                if (Server.ip.equals(cmds[1]) || Server.machine.equals(cmds[1])) {
+                    String fileContents = Server.readFile(Server.getLogFileName(), Charset.forName("UTF-8"));
+                    writer.writeBytes(fileContents);
+                }
+                break;
+            /*
+             * ls: checks if file exists on VM
+             */
+            case "ls":
+                if (FileHandler.fileExists(cmds[1])) {
+                    writer.writeBytes("+++++File found!");
+                } else {
+                    writer.writeBytes("-----not found");
+                }
+                Server.writeToLog(String.format("Checked for %s.", cmds[1]));
+                break;
+            /*
+             * put: receives a file from the client. Saves the file to a tmp file and then
+             * saves the file into the sdfs if the master node sends a signal to save,
+             * otherwise we delete the tmp file and move on.
+             */
+            case "put":
+                // Receive signal to save or not
+                ReplicaReceiveThread receive = new ReplicaReceiveThread(socket, writer, cmds[2]);
+                receive.start();
+                Server.writeToLog("Started replica receive thread");
+
+                // Master node needs to coordinate where files go by sending the save/delete
+                // signals
+                Server.writeToLog(
+                        String.format("Master node is: %s and my ip is %s", FileHandler.getMasterNodeIP(), Server.ip));
+                ReplicaMasterThread master = null;
+                if (Server.ip.equals(FileHandler.getMasterNodeIP())) {
+                    Server.writeToLog("I am the master node!");
+                    master = new ReplicaMasterThread(cmds[2]);
+                    master.start();
+                    Server.writeToLog("Started replica master thread");
+                }
+
+                try {
+                    if (master != null) {
+                        master.join();
+                        Server.writeToLog("Master thread successfully joined");
                     }
-                    // Extract pattern
-                    int patternStart = cmd.indexOf(" ");
-                    ArrayList<String> res = Server.logGrep(cmd.substring(patternStart + 1), Server.getLogFileName());
-                    writer.writeBytes(String.join("\n", res));
-                    Server.writeToLog("Sent grep output to client");
-                    break;
-                /*
-                 *  quit:
-                 *  exits if I was commanded to quit, else update my membership list
-                 */
-                case "quit":
-                    if (cmds.length < 2) {
-                        Server.writeToLog("quit command did not have the right arguments");
-                        return;
-                    }
-                    String quitter = cmds[1];
-                    if (Server.ip.equals(quitter)) {
-                        System.exit(0);
-                    } else {
-                        Server.removeFromMemberList(quitter);
-                    }
-                    Server.writeToLog(String.format("%s naturally exited.", quitter));
-                    break;
-                /*
-                log:
-                sends back the log of a specific ip address
-                 */
-                case "log":
-                    if (cmds.length < 2) {
-                        Server.writeToLog("log command did not have the right arguments");
-                        return;
-                    }
-                    if (Server.ip.equals(cmds[1]) || Server.machine.equals(cmds[1])) {
-                        String fileContents = Server.readFile(Server.getLogFileName(), Charset.forName("UTF-8"));
-                        writer.writeBytes(fileContents);
-                    }
-                    break;
-                /*
-                 ls:
-                 checks if file exists on VM
-                 */
-                case "ls":
+                    receive.join();
+                    Server.writeToLog("Replica threads finished");
+                } catch (InterruptedException e) {
+                    Server.writeToLog(e);
+                }
+                break;
+            /*
+             * get: sends a file to the client
+             */
+            case "get":
+                try {
                     if (FileHandler.fileExists(cmds[1])) {
-                        writer.writeBytes("+++++File found!");
-                    } else {
-                        writer.writeBytes("-----not found");
+                        Server.writeToLog("get: File exists and i'm signalling that I have it");
+                        writer.writeBoolean(true);
+                        Server.writeToLog("get: signaled yes");
+                        int versions = FileHandler.numVersions(cmds[1]);
+                        Server.writeToLog("get: sending file");
+                        FileHandler.sendFile(cmds[1], socket, versions - 1);
+                        Server.writeToLog(String.format("get: sent file %s", cmds[1]));
                     }
-                    Server.writeToLog(String.format("Checked for %s.", cmds[1]));
-                    break;
-                /*
-                put:
-                receives a file from the client. Saves the file to a tmp file and then saves the file into the sdfs
-                if the master node sends a signal to save, otherwise we delete the tmp file and move on.
-                 */
-                case "put":
-                    // Receive signal to save or not
-                    ReplicaReceiveThread receive = new ReplicaReceiveThread(socket, writer, cmds[2]);
-                    receive.start();
-                    Server.writeToLog("Started replica receive thread");
-
-                    // Master node needs to coordinate where files go by sending the save/delete signals
-                    Server.writeToLog(String.format("Master node is: %s and my ip is %s", FileHandler.getMasterNodeIP(), Server.ip));
-                    ReplicaMasterThread master = null;
-                    if (Server.ip.equals(FileHandler.getMasterNodeIP())) {
-                        Server.writeToLog("I am the master node!");
-                        master = new ReplicaMasterThread(cmds[2]);
-                        master.start();
-                        Server.writeToLog("Started replica master thread");
-                    }
-
-                    try {
-                        if (master != null) {
-                            master.join();
-                            Server.writeToLog("Master thread successfully joined");
-                        }
-                        receive.join();
-                        Server.writeToLog("Replica threads finished");
-                    } catch (InterruptedException e) {
-                        Server.writeToLog(e);
-                    }
-                    break;
-                /*
-                get:
-                sends a file to the client
-                 */
-                case "get":
-
-                    try {
-                        if (FileHandler.fileExists(cmds[1])) {
-                            Server.writeToLog("get: File exists and i'm signalling that I have it");
-                            writer.writeBoolean(true);
-                            Server.writeToLog("get: signaled yes");
-                            int versions = FileHandler.numVersions(cmds[1]);
-                            Server.writeToLog("get: sending file");
-                            FileHandler.sendFile(cmds[1], socket, versions - 1);
-                            Server.writeToLog(String.format("get: sent file %s", cmds[1]));
-                        }
-                    } catch (FileNotFoundException e) {
-                        // If we could not find the file on our sdfs, then simply close socket to signal DNE
-                        Server.writeToLog(String.format("IOException: %s", e.getMessage()));
-                    }
-                    break;
-                /*
-                get-versions:
-                get all versions of a file. Writes all versions to a temporary file and then sends that temp file
-                back to the client.
-                */
-                case "get-versions":
-                    try {
-                        if (FileHandler.fileExists(cmds[1])) {
-                            Server.writeToLog("get-versions: File exists and i'm signalling that I have it");
-                            writer.writeBoolean(true);
-                            Server.writeToLog("get-versions: signaled yes");
-                            int numVersions = FileHandler.numVersions(cmds[1]);
-                            Server.writeToLog(String.format("get-versions numVersions: %d", numVersions));
-                            int numVersionsRequested = Integer.parseInt(cmds[2]);
-                            Server.writeToLog(String.format("get-versions numVersionsRequested: %d", numVersionsRequested));
-                            // Concatenate all versions into a tmp file
-                            Path tmpFile = Files.createTempFile(null, null);
-                            Server.writeToLog(String.format("get-versions tmpFile: %s", tmpFile.getFileName()));
-                            if (numVersions - numVersionsRequested > -1) {
-                                Server.writeToLog("get-versions: Concatenating versions to a temp file");
-                                FileOutputStream out = new FileOutputStream(tmpFile.toFile(), true);
-                                for (int i = numVersions - numVersionsRequested; i < numVersions; i++) {
-                                    File versionFile = FileHandler.getVersionContent(cmds[1], i);
-                                    FileHandler.appendFileToFile(versionFile, tmpFile.toFile());
-                                    out.write(FileHandler.DELIMITER.getBytes());
-                                    Server.writeToLog(String.format("get-versions appended version: %d", i));
-                                }
-                                Server.writeToLog(String.format("get-versions Sending concatenated versions: %s", tmpFile.getFileName()));
-                                FileHandler.sendFile(tmpFile.toFile(), socket);
-                            } else {
-                                Server.writeToLog("get-versions: Client requested too many versions");
+                } catch (FileNotFoundException e) {
+                    // If we could not find the file on our sdfs, then simply close socket to signal
+                    // DNE
+                    Server.writeToLog(String.format("IOException: %s", e.getMessage()));
+                }
+                break;
+            /*
+             * get-versions: get all versions of a file. Writes all versions to a temporary
+             * file and then sends that temp file back to the client.
+             */
+            case "get-versions":
+                try {
+                    if (FileHandler.fileExists(cmds[1])) {
+                        Server.writeToLog("get-versions: File exists and i'm signalling that I have it");
+                        writer.writeBoolean(true);
+                        Server.writeToLog("get-versions: signaled yes");
+                        int numVersions = FileHandler.numVersions(cmds[1]);
+                        Server.writeToLog(String.format("get-versions numVersions: %d", numVersions));
+                        int numVersionsRequested = Integer.parseInt(cmds[2]);
+                        Server.writeToLog(String.format("get-versions numVersionsRequested: %d", numVersionsRequested));
+                        // Concatenate all versions into a tmp file
+                        Path tmpFile = Files.createTempFile(null, null);
+                        Server.writeToLog(String.format("get-versions tmpFile: %s", tmpFile.getFileName()));
+                        if (numVersions - numVersionsRequested > -1) {
+                            Server.writeToLog("get-versions: Concatenating versions to a temp file");
+                            FileOutputStream out = new FileOutputStream(tmpFile.toFile(), true);
+                            for (int i = numVersions - numVersionsRequested; i < numVersions; i++) {
+                                File versionFile = FileHandler.getVersionContent(cmds[1], i);
+                                FileHandler.appendFileToFile(versionFile, tmpFile.toFile());
+                                out.write(FileHandler.DELIMITER.getBytes());
+                                Server.writeToLog(String.format("get-versions appended version: %d", i));
                             }
+                            Server.writeToLog(String.format("get-versions Sending concatenated versions: %s",
+                                    tmpFile.getFileName()));
+                            FileHandler.sendFile(tmpFile.toFile(), socket);
+                        } else {
+                            Server.writeToLog("get-versions: Client requested too many versions");
                         }
-                    } catch (FileNotFoundException e) {
-                        Server.writeToLog(e);
                     }
-                    break;
-                /*
-                get:
-                sends a file to the client
-                 */
-                case "delete":
-                    if (FileHandler.fileExists(cmds[1])) {
-                        FileHandler.deleteFile(cmds[1]);
-                        writer.writeBytes(String.format("Deleted %s", cmds[1]));
-                    } else {
-                        writer.writeBytes(String.format("File did not exist %s", cmds[1]));
-                    }
-                    break;
-                default:
-                    Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));
-                    break;
+                } catch (FileNotFoundException e) {
+                    Server.writeToLog(e);
+                }
+                break;
+            /*
+             * get: sends a file to the client
+             */
+            case "delete":
+                if (FileHandler.fileExists(cmds[1])) {
+                    FileHandler.deleteFile(cmds[1]);
+                    writer.writeBytes(String.format("Deleted %s", cmds[1]));
+                } else {
+                    writer.writeBytes(String.format("File did not exist %s", cmds[1]));
+                }
+                break;
+            default:
+                Server.writeToLog(String.format("Received invalid command: %s", cmds[0]));
+                break;
             }
+            writer.flush();
             socket.close();
-        } catch (IOException | InterruptedException e) {
-
+        } catch (Error | Exception e) {
             Server.writeToLog(e);
         }
-
     }
 
 }
 
 class FailureReplicaSendThread extends FailureDetectionThread {
     final int TIMEOUT = 2000;
+
     @Override
     public void run() {
         while (true) {
@@ -628,7 +585,8 @@ class FailureReplicaSendThread extends FailureDetectionThread {
                     Server.writeToLog(String.format("Re-replicating: %s", file.getName()));
                     for (int i = 0; i < Server.group.size(); i++) {
                         if (FileHandler.isReplicaNode(file.getName(), i)) {
-                            Server.writeToLog(String.format("Re-replicating %s to %s", file.getName(), Server.group.get(i)));
+                            Server.writeToLog(
+                                    String.format("Re-replicating %s to %s", file.getName(), Server.group.get(i)));
                             Socket socket = new Socket(Server.group.get(i), FileHandler.FAILURE_REPLICA_PORT);
                             socket.setSoTimeout(TIMEOUT);
                             Server.writeToLog(String.format("Established connection to %s", Server.group.get(i)));
@@ -637,7 +595,8 @@ class FailureReplicaSendThread extends FailureDetectionThread {
                             out.writeUTF(file.getName());
                             boolean sendOrNot = in.readBoolean();
                             if (sendOrNot) {
-                                Server.writeToLog(String.format("Sending %s to %s", file.getName(), Server.group.get(i)));
+                                Server.writeToLog(
+                                        String.format("Sending %s to %s", file.getName(), Server.group.get(i)));
                                 int versions = FileHandler.numVersions(file.getName());
                                 FileHandler.sendFile(file, socket, versions - 1); // Send entire file
                                 Server.writeToLog("Sent re-replication file");
@@ -663,7 +622,7 @@ class FailureReplicaCleanupThread extends Thread {
 
     @Override
     public void run() {
-        while(true) {
+        while (true) {
             try {
                 int myIndex = Server.group.indexOf(Server.ip);
                 if (myIndex != -1) {
@@ -671,7 +630,8 @@ class FailureReplicaCleanupThread extends Thread {
                         if (!FileHandler.isReplicaNode(file.getName(), myIndex)) {
                             Server.writeToLog(String.format("Deleting-file: %s", file.getName()));
                             Server.writeToLog(String.format("Deleting-hashcode: %s", file.getName().hashCode()));
-                            Server.writeToLog(String.format("Deleting-file-node: %d", FileHandler.getNodeFromFile(file.getName())));
+                            Server.writeToLog(String.format("Deleting-file-node: %d",
+                                    FileHandler.getNodeFromFile(file.getName())));
                             Server.writeToLog(String.format("Deleting-group: %s", Server.group.toString()));
                             Server.writeToLog(String.format("Deleting-myIndex: %d", myIndex));
                             Server.writeToLog(String.format("Deleting-Server.ip: %s", Server.ip));
@@ -706,11 +666,13 @@ class FailureReplicaReceiveThread extends Thread {
             try {
                 Socket socket = serverSocket.accept();
                 socket.setSoTimeout(TIMEOUT);
-                Server.writeToLog(String.format("Got connection for re-replication from %s", socket.getRemoteSocketAddress().toString()));
+                // Server.writeToLog(String.format("Got connection for re-replication from %s",
+                // socket.getRemoteSocketAddress().toString()));
                 DataInputStream in = new DataInputStream(socket.getInputStream());
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                 String filename = in.readUTF().trim();
-                Server.writeToLog(String.format("File to be re-replicated on me: %s", filename));
+                // Server.writeToLog(String.format("File to be re-replicated on me: %s",
+                // filename));
                 if (!FileHandler.fileExists(filename)) {
                     Server.writeToLog("File does not exist for me, accepting re-replication file");
                     out.writeBoolean(true);
@@ -718,7 +680,8 @@ class FailureReplicaReceiveThread extends Thread {
                     Server.writeToLog(String.format("Saved re-replication file: %s", filename));
                 } else {
                     out.writeBoolean(false);
-                    Server.writeToLog(String.format("Re-replication file already exists: %s", filename));
+                    // Server.writeToLog(String.format("Re-replication file already exists: %s",
+                    // filename));
                 }
             } catch (IOException e) {
                 Server.writeToLog(e);
@@ -753,7 +716,6 @@ class ReplicaReceiveThread extends Thread {
             }
         } catch (IOException e) {
             Server.writeToLog(e);
-
         }
     }
 }
@@ -788,7 +750,7 @@ class ReplicaMasterThread extends Thread {
 }
 
 class FailureDetectionThread extends Thread {
-    public static final int[] neighbors = {-2, -1, 1, 2};
+    public static final int[] neighbors = { -2, -1, 1, 2 };
     static final int PROTOCOL_PERIOD = 400;
     static final int FAIL_TIME = 1000;
     SocketHelper socket;
@@ -801,12 +763,14 @@ class FailureDetectionThread extends Thread {
     }
 
     /*
-     Since we can't use Thread.sleep because it is a static sleep that only sleeps
-     the currently running main thread, we will use the system clock for a sleeping
+     * Since we can't use Thread.sleep because it is a static sleep that only sleeps
+     * the currently running main thread, we will use the system clock for a
+     * sleeping
      */
     void systemClockSleep(int millis) {
         Date start = new Date();
-        while ((new Date().getTime() - start.getTime()) < millis) ;
+        while ((new Date().getTime() - start.getTime()) < millis)
+            ;
     }
 
     void disseminate() throws IOException {
@@ -844,11 +808,7 @@ class AckThread extends FailureDetectionThread implements Runnable {
 
 class PingThread extends FailureDetectionThread implements Runnable {
     private int i = 0;
-    public void replicateFiles(String failed) {
-    	for(int j = 0; j < Server.fileList.size(); j++) {
-    		
-    	}
-    }
+
     private String nextNeighbor() {
         i = (i + 1) % neighbors.length;
         int neighborIndex = (Server.group.indexOf(Server.ip) + neighbors[i]) % Server.group.size();
@@ -897,7 +857,8 @@ class IntroducerThread extends FailureDetectionThread implements Runnable {
             socket = new SocketHelper(SocketHelper.INTRODUCER_PORT);
             /*
              * The introducer thread is on an infinite loop to accept single IP addresses,
-             * add them to its member list, and send out its updated member list to the entire group.
+             * add them to its member list, and send out its updated member list to the
+             * entire group.
              */
             while (true) {
                 DatagramPacket packet = socket.receive();
@@ -928,66 +889,13 @@ class ConnectThread extends FailureDetectionThread implements Runnable {
 }
 
 /**
- * This thread is used for recieving new file membership lists, and sending Files over if applicable
- * (615)
- */
-class fileThread extends MyThread implements Runnable {
-	
-    @Override
-    public void run() {
-    	System.out.println("fileThread");
-        try {
-            @SuppressWarnings("resource")
-			ServerSocket fileSocket = new ServerSocket(2048);
-            @SuppressWarnings("resource")
-			ServerSocket receiveSocket = new ServerSocket(2049);
-            while (true) {
-            	Socket accepted = fileSocket.accept();
-            	System.out.println("Lost file signal");
-            	BufferedReader reader = new BufferedReader(new InputStreamReader(accepted.getInputStream()));
-            	String fileInfo = reader.readLine();
-            	System.out.println(fileInfo);
-            	String [] membership = fileInfo.split(":");
-            	String file = membership[0].trim();
-            	String newMembers = membership[1].trim();
-            	File f = new File(file);
-            	if(f.exists()) {
-            		System.out.println("I have the file, I will now try to replicate.");
-            		String origList = Server.fileList.get(file);
-            		String [] newMem = newMembers.split(",");
-            		for(int i = 0; i < newMem.length; i++) {
-            			if(!origList.contains(newMem[i].trim())) {
-            				// We'll send the file to the new participant in the membership list
-            				Socket sock = new Socket(newMem[i], 2049);
-            				FileHandler.sendFile(file, sock);
-            				sock.close();
-            			}
-            		}
-            	}
-            	if(!f.exists() && newMembers.contains(Server.ip)) {
-            		// new member list
-            		Socket fileReceiver = receiveSocket.accept();
-            		FileHandler.receiveFile(file, fileReceiver);
-            		fileReceiver.close();
-            	}
-            	Server.fileList.put(file, newMembers);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-}
-
-
-/**
  * Contains a helper functions for UDP programming
  */
 class SocketHelper {
-
-    static final int CONNECT_PORT = 14120;
-    static final int INTRODUCER_PORT = 14112;
-    static final int PING_PORT = 14110;
-    static final int ACK_PORT = 14111;
+    static final int CONNECT_PORT = 65005;
+    static final int INTRODUCER_PORT = 65006;
+    static final int PING_PORT = 65007;
+    static final int ACK_PORT = 65008;
     Random random = new Random();
 
     private final int BUFFER_SIZE = 4096;
